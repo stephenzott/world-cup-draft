@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 World Cup Fantasy Draft Order</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #141929;
+      --surface2: #1e2640;
+      --accent: #00d4aa;
+      --gold: #e8b84b;
+      --text: #e8eaf0;
+      --muted: #8892a4;
+      --red: #e05252;
+      --green: #52c478;
+      --border: #2a3352;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0d1b3e 0%, #1a3a6b 100%);
+      padding: 1.5rem 2rem;
+      border-bottom: 2px solid var(--accent);
+      text-align: center;
+    }
+
+    header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
+    header p { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+
+    .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+
+    h2 {
+      font-size: 0.85rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section { margin-bottom: 2.5rem; }
+
+    /* ── Draft Order Table ── */
+    .draft-table { width: 100%; border-collapse: collapse; }
+
+    .draft-table th {
+      background: var(--surface2);
+      padding: 0.6rem 0.9rem;
+      text-align: left;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .draft-table td {
+      padding: 0.65rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 0.88rem;
+      vertical-align: middle;
+    }
+
+    .draft-table tr:last-child td { border-bottom: none; }
+    .draft-table tr:hover td { background: var(--surface2); }
+    .draft-table th:first-child, .draft-table td:first-child { border-radius: 0; }
+
+    .rank-cell { font-weight: 700; font-size: 1rem; color: var(--muted); width: 2.5rem; text-align: center; }
+    .r1 { color: #ffd700; }
+    .r2 { color: #c0c0c0; }
+    .r3 { color: #cd7f32; }
+
+    .ft-name input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed transparent;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.88rem;
+      font-family: inherit;
+      width: 180px;
+      cursor: text;
+      padding: 0;
+    }
+    .ft-name input:hover, .ft-name input:focus {
+      border-bottom-color: var(--accent);
+      outline: none;
+    }
+
+    .wc-chips { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; }
+
+    .chip {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .chip-tbd    { background: #1e2640; color: var(--muted); }
+    .chip-out    { background: #2a1818; color: #e07070; }
+    .chip-r32    { background: #1a1a2e; color: #8888cc; }
+    .chip-r16    { background: #0a1e2e; color: #5aabcc; }
+    .chip-qf     { background: #0d2a1a; color: #52c478; }
+    .chip-sf     { background: #2a1e00; color: #e8a020; }
+    .chip-final  { background: #2a2020; color: #d0d0d0; }
+    .chip-champ  { background: #2a2200; color: #ffd700; }
+
+    .stat-cell { text-align: center; font-size: 0.85rem; min-width: 4rem; }
+    .stat-na { color: var(--muted); }
+    .gd-pos { color: var(--green); }
+    .gd-neg { color: var(--red); }
+    .gd-zero { color: var(--muted); }
+
+    .coin-input {
+      width: 44px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 0.2rem 0.3rem;
+      font-size: 0.8rem;
+      text-align: center;
+      font-family: inherit;
+    }
+    .coin-input:focus { outline: none; border-color: var(--accent); }
+
+    .tied-tag {
+      font-size: 0.62rem;
+      color: var(--gold);
+      background: #1e1800;
+      border: 1px solid #3a3200;
+      border-radius: 3px;
+      padding: 0.1rem 0.3rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+
+    /* ── Groups Grid ── */
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 0.9rem;
+    }
+
+    .group-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .group-header {
+      background: var(--surface2);
+      padding: 0.45rem 0.75rem;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--gold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .team-row {
+      display: grid;
+      grid-template-columns: 1fr 110px 88px;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .team-row:last-child { border-bottom: none; }
+
+    .team-label { font-size: 0.8rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .owner-label { font-size: 0.62rem; color: var(--muted); margin-top: 0.1rem; }
+
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 0.22rem 0.3rem;
+      font-size: 0.72rem;
+      font-family: inherit;
+      width: 100%;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    .goals-wrap { display: flex; align-items: center; gap: 3px; }
+    .goals-wrap input {
+      width: 36px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 0.22rem 0.25rem;
+      font-size: 0.75rem;
+      text-align: center;
+      font-family: inherit;
+    }
+    .goals-wrap input:focus { outline: none; border-color: var(--accent); }
+    .goals-wrap span { color: var(--muted); font-size: 0.75rem; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.72rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); }
+
+    .footer-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>&#9917; 2026 FIFA World Cup &mdash; Fantasy Draft Order</h1>
+  <p>Updates live as results are entered &nbsp;&bull;&nbsp; Data saved in browser</p>
+</header>
+
+<div class="container">
+
+  <section>
+    <h2>Draft Order</h2>
+    <div class="legend">
+      <span class="legend-item"><span class="chip chip-tbd">—</span> Not started</span>
+      <span class="legend-item"><span class="chip chip-out">Group</span> Group stage exit</span>
+      <span class="legend-item"><span class="chip chip-r32">R32</span></span>
+      <span class="legend-item"><span class="chip chip-r16">R16</span></span>
+      <span class="legend-item"><span class="chip chip-qf">QF</span></span>
+      <span class="legend-item"><span class="chip chip-sf">SF</span></span>
+      <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
+      <span class="legend-item"><span class="chip chip-champ">&#127942;</span> Champion</span>
+    </div>
+    <table class="draft-table">
+      <thead>
+        <tr>
+          <th style="text-align:center">#</th>
+          <th>Fantasy Team</th>
+          <th style="text-align:center">Best Result</th>
+          <th style="text-align:center">Total Rounds</th>
+          <th style="text-align:center">Total GD</th>
+          <th style="text-align:center" title="Lower number = earlier in coin-flip sequence">Coin Flip</th>
+        </tr>
+      </thead>
+      <tbody id="order-body"></tbody>
+    </table>
+    <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip &nbsp;|&nbsp; Click team names to rename</p>
+  </section>
+
+  <section>
+    <h2>Tournament Results</h2>
+    <div class="groups-grid" id="groups-grid"></div>
+  </section>
+
+</div>
+
+<script>
+const FANTASY_TEAMS = [
+  { id:  1, defaultName: 'Fantasy Team 1',  teams: ['Argentina', 'Morocco', "Côte d'Ivoire", 'New Zealand'] },
+  { id:  2, defaultName: 'Fantasy Team 2',  teams: ['Belgium', 'Croatia', 'Saudi Arabia', 'DR Congo'] },
+  { id:  3, defaultName: 'Fantasy Team 3',  teams: ['Mexico', 'Austria', 'Uzbekistan', 'Haiti'] },
+  { id:  4, defaultName: 'Fantasy Team 4',  teams: ['Netherlands', 'Australia', 'Scotland', 'Ghana'] },
+  { id:  5, defaultName: 'Fantasy Team 5',  teams: ['Canada', 'Senegal', 'Algeria', 'Turkey'] },
+  { id:  6, defaultName: 'Fantasy Team 6',  teams: ['France', 'Uruguay', 'Paraguay', 'Sweden'] },
+  { id:  7, defaultName: 'Fantasy Team 7',  teams: ['Spain', 'Iran', 'Panama', 'Iraq'] },
+  { id:  8, defaultName: 'Fantasy Team 8',  teams: ['Brazil', 'Korea Republic', 'Egypt', 'Curaçao'] },
+  { id:  9, defaultName: 'Fantasy Team 9',  teams: ['England', 'Japan', 'Qatar', 'Czechia'] },
+  { id: 10, defaultName: 'Fantasy Team 10', teams: ['USA', 'Switzerland', 'Norway', 'Jordan'] },
+  { id: 11, defaultName: 'Fantasy Team 11', teams: ['Germany', 'Colombia', 'Tunisia', 'Cape Verde'] },
+  { id: 12, defaultName: 'Fantasy Team 12', teams: ['Portugal', 'Ecuador', 'South Africa', 'Bosnia and Herzegovina'] },
+];
+
+const GROUPS = {
+  A: ['Mexico', 'Korea Republic', 'Czechia', 'South Africa'],
+  B: ['Canada', 'Switzerland', 'Qatar', 'Bosnia and Herzegovina'],
+  C: ['Brazil', 'Morocco', 'Scotland', 'Haiti'],
+  D: ['USA', 'Australia', 'Paraguay', 'Turkey'],
+  E: ['Germany', "Côte d'Ivoire", 'Curaçao', 'Ecuador'],
+  F: ['Netherlands', 'Japan', 'Tunisia', 'Sweden'],
+  G: ['Belgium', 'Iran', 'Egypt', 'New Zealand'],
+  H: ['Spain', 'Uruguay', 'Saudi Arabia', 'Cape Verde'],
+  I: ['France', 'Senegal', 'Norway', 'Iraq'],
+  J: ['Argentina', 'Austria', 'Algeria', 'Jordan'],
+  K: ['Portugal', 'Colombia', 'DR Congo', 'Uzbekistan'],
+  L: ['England', 'Croatia', 'Panama', 'Ghana'],
+};
+
+const ROUND_OPTIONS = [
+  { v: -1, label: '— Not started' },
+  { v:  0, label: 'Group Stage' },
+  { v:  1, label: 'Round of 32' },
+  { v:  2, label: 'Round of 16' },
+  { v:  3, label: 'Quarter-Final' },
+  { v:  4, label: 'Semi-Final' },
+  { v:  5, label: 'Runner-Up' },
+  { v:  6, label: 'Champion' },
+];
+
+const ROUND_CHIP = {
+  '-1': ['chip-tbd',   '—'],
+  '0':  ['chip-out',   'Group'],
+  '1':  ['chip-r32',   'R32'],
+  '2':  ['chip-r16',   'R16'],
+  '3':  ['chip-qf',    'QF'],
+  '4':  ['chip-sf',    'SF'],
+  '5':  ['chip-final', 'Final'],
+  '6':  ['chip-champ', '\u{1F3C6}'],
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'wcDraft2026';
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { results: {}, coinFlip: {}, names: {} };
+
+Object.values(GROUPS).flat().forEach(t => {
+  if (!state.results[t]) state.results[t] = { round: -1, gf: 0, ga: 0 };
+});
+FANTASY_TEAMS.forEach(ft => {
+  if (state.coinFlip[ft.id] == null) state.coinFlip[ft.id] = ft.id;
+  if (!state.names[ft.id]) state.names[ft.id] = ft.defaultName;
+});
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// ── Scoring ────────────────────────────────────────────────────────────────
+
+function calcScore(ft) {
+  const rs = ft.teams.map(t => state.results[t] || { round: -1, gf: 0, ga: 0 });
+  const played = rs.filter(r => r.round >= 0);
+  return {
+    maxRound:    played.length ? Math.max(...played.map(r => r.round)) : -1,
+    totalRounds: played.reduce((s, r) => s + r.round, 0),
+    totalGD:     rs.reduce((s, r) => s + (r.gf || 0) - (r.ga || 0), 0),
+  };
+}
+
+function sortOrder() {
+  return FANTASY_TEAMS.map(ft => ({
+    ...ft,
+    name:     state.names[ft.id],
+    score:    calcScore(ft),
+    coinFlip: state.coinFlip[ft.id],
+  })).sort((a, b) => {
+    if (b.score.maxRound    !== a.score.maxRound)    return b.score.maxRound    - a.score.maxRound;
+    if (b.score.totalRounds !== a.score.totalRounds) return b.score.totalRounds - a.score.totalRounds;
+    if (b.score.totalGD     !== a.score.totalGD)     return b.score.totalGD     - a.score.totalGD;
+    return a.coinFlip - b.coinFlip;
+  });
+}
+
+function ownerName(team) {
+  const ft = FANTASY_TEAMS.find(f => f.teams.includes(team));
+  return ft ? (state.names[ft.id] || ft.defaultName) : '?';
+}
+
+// ── Render Draft Order ─────────────────────────────────────────────────────
+
+function renderOrder() {
+  const order = sortOrder();
+  const tbody = document.getElementById('order-body');
+  tbody.innerHTML = '';
+
+  order.forEach((ft, i) => {
+    const s = ft.score;
+    const [chipCls, chipLbl] = ROUND_CHIP[String(s.maxRound)] || ROUND_CHIP['-1'];
+    const gdVal = s.maxRound >= 0 ? (s.totalGD > 0 ? '+' + s.totalGD : String(s.totalGD)) : null;
+    const gdCls = s.totalGD > 0 ? 'gd-pos' : s.totalGD < 0 ? 'gd-neg' : 'gd-zero';
+    const rankCls = i === 0 ? 'rank-cell r1' : i === 1 ? 'rank-cell r2' : i === 2 ? 'rank-cell r3' : 'rank-cell';
+
+    // Check if tied with previous on all non-coin-flip criteria
+    let tiedTag = '';
+    if (i > 0) {
+      const prev = order[i - 1];
+      if (s.maxRound === prev.score.maxRound &&
+          s.totalRounds === prev.score.totalRounds &&
+          s.totalGD === prev.score.totalGD) {
+        tiedTag = '<span class="tied-tag">coin flip</span>';
+      }
+    }
+
+    const chips = ft.teams.map(t => {
+      const r = state.results[t] || { round: -1 };
+      const [cc, cl] = ROUND_CHIP[String(r.round)] || ROUND_CHIP['-1'];
+      const short = t.length > 12 ? t.slice(0, 11) + '…' : t;
+      return `<span class="chip ${cc}" title="${t}">${short}: ${cl}</span>`;
+    }).join('');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="${rankCls}">${i + 1}</td>
+      <td>
+        <div class="ft-name">
+          <input type="text" value="${esc(ft.name)}" data-id="${ft.id}" onchange="renameFT(this)" />
+          ${tiedTag}
+        </div>
+        <div class="wc-chips">${chips}</div>
+      </td>
+      <td class="stat-cell"><span class="chip ${chipCls}">${chipLbl}</span></td>
+      <td class="stat-cell ${s.maxRound < 0 ? 'stat-na' : ''}">${s.maxRound >= 0 ? s.totalRounds : '—'}</td>
+      <td class="stat-cell ${s.maxRound >= 0 ? gdCls : 'stat-na'}">${gdVal !== null ? gdVal : '—'}</td>
+      <td class="stat-cell">
+        <input type="number" class="coin-input" min="1" max="12"
+               value="${ft.coinFlip}" data-id="${ft.id}"
+               onchange="updateCoin(this)"
+               title="Coin flip tiebreak seed (lower = earlier)" />
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Render Groups ──────────────────────────────────────────────────────────
+
+function renderGroups() {
+  const grid = document.getElementById('groups-grid');
+  grid.innerHTML = '';
+
+  Object.entries(GROUPS).forEach(([grp, teams]) => {
+    const card = document.createElement('div');
+    card.className = 'group-card';
+
+    const rows = teams.map(team => {
+      const r = state.results[team] || { round: -1, gf: 0, ga: 0 };
+      const opts = ROUND_OPTIONS.map(o =>
+        `<option value="${o.v}"${r.round === o.v ? ' selected' : ''}>${o.label}</option>`
+      ).join('');
+
+      return `
+        <div class="team-row">
+          <div>
+            <div class="team-label" title="${esc(team)}">${esc(team)}</div>
+            <div class="owner-label">${esc(ownerName(team))}</div>
+          </div>
+          <select data-team="${esc(team)}" onchange="updateRound(this)">${opts}</select>
+          <div class="goals-wrap">
+            <input type="number" min="0" value="${r.gf || 0}" data-team="${esc(team)}" data-f="gf" onchange="updateGoal(this)" title="Goals For" />
+            <span>:</span>
+            <input type="number" min="0" value="${r.ga || 0}" data-team="${esc(team)}" data-f="ga" onchange="updateGoal(this)" title="Goals Against" />
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = `<div class="group-header">Group ${grp}</div>${rows}`;
+    grid.appendChild(card);
+  });
+}
+
+// ── Event Handlers ─────────────────────────────────────────────────────────
+
+function updateRound(sel) {
+  state.results[sel.dataset.team].round = parseInt(sel.value);
+  save(); renderOrder();
+}
+
+function updateGoal(inp) {
+  state.results[inp.dataset.team][inp.dataset.f] = parseInt(inp.value) || 0;
+  save(); renderOrder();
+}
+
+function renameFT(inp) {
+  const id = parseInt(inp.dataset.id);
+  state.names[id] = inp.value.trim() || FANTASY_TEAMS.find(f => f.id === id).defaultName;
+  save(); renderOrder(); renderGroups();
+}
+
+function updateCoin(inp) {
+  state.coinFlip[parseInt(inp.dataset.id)] = parseInt(inp.value) || 1;
+  save(); renderOrder();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+renderOrder();
+renderGroups();
+</script>
+</body>
+</html>
