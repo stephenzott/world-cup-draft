@@ -334,7 +334,7 @@
 
   <nav class="tabs-nav">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
-    <button class="tab-btn" onclick="showTab('manual')">Manual Entry</button>
+    <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
   </nav>
 
   <!-- ── Tab: Draft Order ── -->
@@ -848,6 +848,10 @@ renderGroupsRO();
 renderCoinFlips();
 syncNow();
 syncTimer = setInterval(syncNow, SYNC_MS);
+
+if (new URLSearchParams(location.search).has('admin')) {
+  document.getElementById('manual-tab-btn').style.display = '';
+}
 </script>
 </body>
 </html>
