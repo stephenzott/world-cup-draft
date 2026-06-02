@@ -130,8 +130,9 @@
     .chip-qf     { background: #e8f5ee; color: #1a7a3a; }
     .chip-4th    { background: #fefce8; color: #8a7200; }
     .chip-3rd    { background: var(--gold); color: #111111; }
-    .chip-final  { background: #ebebeb; color: #444444; }
-    .chip-champ  { background: var(--gold); color: #111111; outline: 2px solid #111; outline-offset: -2px; }
+    .chip-sf     { background: #fff3e0; color: #c05000; }
+    .chip-final  { background: #d4d4d4; color: #222222; outline: 1px solid #999; outline-offset: -1px; }
+    .chip-champ  { background: var(--gold); color: #111111; outline: 2px solid #333; outline-offset: -2px; font-weight: 800; }
 
     .stat-cell { text-align: center; font-size: 0.85rem; min-width: 4rem; }
     .stat-na { color: var(--muted); }
@@ -294,6 +295,7 @@
       transition: border-color 0.15s, color 0.15s;
     }
     .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .stage-pill { background: #e8ecff; color: var(--border); border: 1px solid var(--border); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -302,6 +304,7 @@
   <h1><a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/standings" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;"><img src="trophy.png" alt="FIFA World Cup Trophy" style="height:2rem;margin-right:0.5rem;vertical-align:middle;"></a>2026 FIFA World Cup &mdash; Fantasy Draft Order</h1>
   <p>Updates live as results are entered &nbsp;&bull;&nbsp; Data saved in browser</p>
   <div class="sync-bar">
+    <span id="stage-pill" class="sync-pill stage-pill">Group Stage</span>
     <span id="sync-status" class="sync-pill sync-waiting">&#9679; Waiting for 2026 data</span>
     <button class="sync-btn" onclick="syncNow()">Sync Now</button>
     <button class="sync-btn" id="pause-btn" onclick="togglePause()">Pause Auto-sync</button>
@@ -326,6 +329,7 @@
         <span class="legend-item"><span class="chip chip-r32">R32</span></span>
         <span class="legend-item"><span class="chip chip-r16">R16</span></span>
         <span class="legend-item"><span class="chip chip-qf">QF</span></span>
+        <span class="legend-item"><span class="chip chip-sf">SF</span></span>
         <span class="legend-item"><span class="chip chip-4th">4th</span> Lost 3rd-place game</span>
         <span class="legend-item"><span class="chip chip-3rd">3rd</span> Won 3rd-place game</span>
         <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
@@ -415,6 +419,7 @@ const ROUND_OPTIONS = [
   { v:  1, label: 'Round of 32' },
   { v:  2, label: 'Round of 16' },
   { v:  3, label: 'Quarter-Final' },
+  { v:  3.5, label: 'Semi-Final' },
   { v:  4, label: '4th Place' },
   { v:  5, label: '3rd Place' },
   { v:  6, label: 'Runner-Up' },
@@ -478,6 +483,7 @@ const ROUND_CHIP = {
   '1':  ['chip-r32',   'R32'],
   '2':  ['chip-r16',   'R16'],
   '3':  ['chip-qf',    'QF'],
+  '3.5':['chip-sf',   'SF'],
   '4':  ['chip-4th',   '4th'],
   '5':  ['chip-3rd',   '3rd'],
   '6':  ['chip-final', 'Final'],
@@ -507,6 +513,7 @@ function showTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => {
     p.classList.toggle('active', p.id === `tab-${name}`);
   });
+  if (name === 'manual') renderGroups();
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -538,6 +545,22 @@ function sortOrder() {
 function ownerName(team) {
   const ft = FANTASY_TEAMS.find(f => f.teams.includes(team));
   return ft ? ft.defaultName : '?';
+}
+
+function currentStage() {
+  const max = Math.max(...Object.values(state.results).map(r => r.round));
+  if (max < 1)   return 'Group Stage';
+  if (max < 2)   return 'Round of 32';
+  if (max < 3)   return 'Round of 16';
+  if (max < 3.5) return 'Quarter-Finals';
+  if (max < 5)   return 'Semi-Finals';
+  if (max < 7)   return 'Final';
+  return 'Complete';
+}
+
+function renderStage() {
+  const el = document.getElementById('stage-pill');
+  if (el) el.textContent = currentStage();
 }
 
 // ── Render Draft Order ─────────────────────────────────────────────────────
@@ -587,6 +610,7 @@ function renderOrder() {
     `;
     tbody.appendChild(tr);
   });
+  renderStage();
 }
 
 // ── Render Groups (read-only) ──────────────────────────────────────────────
@@ -737,6 +761,8 @@ const KO_STAGES = [
   { name: 'Round of 32',          win: null, loss: 1 },
 ];
 
+// Withdrawn/forfeit: 3-0 awarded to the non-withdrawing side. The API should
+// reflect this in goals, so no special handling needed beyond correct goal entry.
 function didWin(match, appName) {
   const isHome = normName(match.home_team.name) === appName;
   const hg = match.home_team_goals || 0;
@@ -806,7 +832,12 @@ async function syncNow() {
 
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setStatus('ok', `&#10003; Live &mdash; synced ${t}`);
-    if (changed) { save(); renderOrder(); renderGroups(); renderGroupsRO(); }
+    if (changed) {
+      save();
+      renderOrder();
+      renderGroupsRO();
+      if (document.getElementById('tab-manual').classList.contains('active')) renderGroups();
+    }
   } catch (e) {
     setStatus('error', `&#10007; Sync failed: ${e.message}`);
   }
