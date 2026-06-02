@@ -226,6 +226,30 @@
       margin-top: 0.5rem;
       text-align: right;
     }
+
+    /* ── Sync bar ── */
+    .sync-bar { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .sync-pill {
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+    .sync-waiting { background: #1e1800; color: var(--gold); border: 1px solid #3a3200; }
+    .sync-syncing { background: #0a1e2e; color: #5aabcc; border: 1px solid #1a3a52; }
+    .sync-ok      { background: #0d2a1a; color: var(--green); border: 1px solid #1a4a2a; }
+    .sync-error   { background: #2a1010; color: var(--red); border: 1px solid #4a2020; }
+    .sync-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 4px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 </head>
 <body>
@@ -233,6 +257,11 @@
 <header>
   <h1>&#9917; 2026 FIFA World Cup &mdash; Fantasy Draft Order</h1>
   <p>Updates live as results are entered &nbsp;&bull;&nbsp; Data saved in browser</p>
+  <div class="sync-bar">
+    <span id="sync-status" class="sync-pill sync-waiting">&#9679; Waiting for 2026 data</span>
+    <button class="sync-btn" onclick="syncNow()">Sync Now</button>
+    <button class="sync-btn" id="pause-btn" onclick="togglePause()">Pause Auto-sync</button>
+  </div>
 </header>
 
 <div class="container">
@@ -491,10 +520,138 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── API Sync ───────────────────────────────────────────────────────────────
+
+const API_BASE = 'https://worldcupjson.net';
+const SYNC_MS   = 90_000; // 90s — well within the 10 req/min rate limit
+
+// Map API team names → app names for cases that differ
+const API_NAME_MAP = {
+  'United States':                    'USA',
+  'United States of America':         'USA',
+  'South Korea':                      'Korea Republic',
+  'Republic of Korea':                'Korea Republic',
+  'Ivory Coast':                      "Côte d'Ivoire",
+  'Czech Republic':                   'Czechia',
+  'Bosnia & Herzegovina':             'Bosnia and Herzegovina',
+  'Bosnia-Herzegovina':               'Bosnia and Herzegovina',
+  'Congo DR':                         'DR Congo',
+  'Democratic Republic of Congo':     'DR Congo',
+  'Democratic Republic of the Congo': 'DR Congo',
+};
+
+function normName(n) { return API_NAME_MAP[n] || n; }
+
+// Knockout stages, deepest first — win/loss round values match app's ROUND_OPTIONS
+const KO_STAGES = [
+  { name: 'Final',                win: 6,    loss: 5 },
+  { name: 'Third place play-off', win: 4,    loss: 4 },
+  { name: 'Semi-final',           win: null, loss: 4 },
+  { name: 'Semi-finals',          win: null, loss: 4 },
+  { name: 'Quarter-final',        win: null, loss: 3 },
+  { name: 'Quarter-finals',       win: null, loss: 3 },
+  { name: 'Round of 16',          win: null, loss: 2 },
+  { name: 'Round of 32',          win: null, loss: 1 },
+];
+
+function didWin(match, appName) {
+  const isHome = normName(match.home_team.name) === appName;
+  const hg = match.home_team_goals || 0;
+  const ag = match.away_team_goals || 0;
+  if (hg !== ag) return isHome ? hg > ag : ag > hg;
+  // Penalty tiebreak (penalties don't count toward GD)
+  const hp = match.home_team?.penalties ?? match.home_team_penalties ?? 0;
+  const ap = match.away_team?.penalties ?? match.away_team_penalties ?? 0;
+  if (hp !== ap) return isHome ? hp > ap : ap > hp;
+  return null; // draw (group stage)
+}
+
+function statsFromMatches(appName, matches) {
+  const mine = matches.filter(m =>
+    normName(m.home_team.name) === appName || normName(m.away_team.name) === appName
+  );
+  const done = mine.filter(m => m.status === 'completed');
+  if (!done.length) return null;
+
+  let gf = 0, ga = 0;
+  for (const m of done) {
+    const home = normName(m.home_team.name) === appName;
+    gf += home ? (m.home_team_goals || 0) : (m.away_team_goals || 0);
+    ga += home ? (m.away_team_goals || 0) : (m.home_team_goals || 0);
+  }
+
+  let round = -1;
+  // Walk knockout stages deepest → shallowest
+  for (const stage of KO_STAGES) {
+    const sm = done.find(m => m.stage_name === stage.name);
+    if (!sm) continue;
+    const won = didWin(sm, appName);
+    if (won === false || won === null) { round = stage.loss; break; }
+    if (won === true && stage.win !== null) { round = stage.win; break; }
+    // won === true and stage.win === null: still in, keep checking deeper stages
+  }
+
+  // No knockout appearance → group stage only
+  if (round === -1) {
+    const grpDone = done.filter(m => m.stage_name === 'First stage');
+    if (grpDone.length >= 3) round = 0; // didn't advance
+  }
+
+  return { round, gf, ga };
+}
+
+let syncPaused = false;
+let syncTimer  = null;
+
+async function syncNow() {
+  if (syncPaused) return;
+  setStatus('syncing', '&#8635; Syncing…');
+  try {
+    const res = await fetch(`${API_BASE}/matches`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const matches = await res.json();
+
+    // Guard: only process if data is from the 2026 tournament
+    const is2026 = Array.isArray(matches) && matches.some(
+      m => m.datetime && new Date(m.datetime) >= new Date('2026-06-11')
+    );
+    if (!is2026) {
+      setStatus('waiting', '&#9679; Waiting for 2026 tournament data');
+      return;
+    }
+
+    let changed = false;
+    for (const team of Object.values(GROUPS).flat()) {
+      const s = statsFromMatches(team, matches);
+      if (s) { state.results[team] = { round: s.round, gf: s.gf, ga: s.ga }; changed = true; }
+    }
+
+    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setStatus('ok', `&#10003; Live &mdash; synced ${t}`);
+    if (changed) { save(); renderOrder(); renderGroups(); }
+  } catch (e) {
+    setStatus('error', `&#10007; Sync failed: ${e.message}`);
+  }
+}
+
+function setStatus(type, html) {
+  const el = document.getElementById('sync-status');
+  el.innerHTML = html;
+  el.className = `sync-pill sync-${type}`;
+}
+
+function togglePause() {
+  syncPaused = !syncPaused;
+  document.getElementById('pause-btn').textContent = syncPaused ? 'Resume Auto-sync' : 'Pause Auto-sync';
+  if (!syncPaused) syncNow();
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 
 renderOrder();
 renderGroups();
+syncNow();
+syncTimer = setInterval(syncNow, SYNC_MS);
 </script>
 </body>
 </html>
