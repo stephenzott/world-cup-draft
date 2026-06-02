@@ -340,7 +340,6 @@
             <th style="text-align:center">Best Result</th>
             <th style="text-align:center">Total Rounds</th>
             <th style="text-align:center">Total GD</th>
-            <th style="text-align:center" title="Lower number = earlier in coin-flip sequence">Coin Flip</th>
           </tr>
         </thead>
         <tbody id="order-body"></tbody>
@@ -364,6 +363,14 @@
         Override or supplement API data. Changes save automatically and update the draft order.
       </p>
       <div class="groups-grid" id="groups-grid"></div>
+    </section>
+
+    <section>
+      <h2>Coin Flip Seeds</h2>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;">
+        Used only to break ties when all other criteria are equal. Lower number drafts earlier.
+      </p>
+      <div id="coin-flip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.5rem;"></div>
     </section>
 
   </div>
@@ -526,12 +533,6 @@ function renderOrder() {
       <td class="stat-cell"><span class="chip ${chipCls}">${chipLbl}</span></td>
       <td class="stat-cell ${s.maxRound < 0 ? 'stat-na' : ''}">${s.maxRound >= 0 ? s.totalRounds : '—'}</td>
       <td class="stat-cell ${s.maxRound >= 0 ? gdCls : 'stat-na'}">${gdVal !== null ? gdVal : '—'}</td>
-      <td class="stat-cell">
-        <input type="number" class="coin-input" min="1" max="12"
-               value="${ft.coinFlip}" data-id="${ft.id}"
-               onchange="updateCoin(this)"
-               title="Coin flip tiebreak seed (lower = earlier)" />
-      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -603,6 +604,22 @@ function renderGroups() {
   });
 }
 
+// ── Render Coin Flip Seeds ─────────────────────────────────────────────────
+
+function renderCoinFlips() {
+  const grid = document.getElementById('coin-flip-grid');
+  grid.innerHTML = '';
+  FANTASY_TEAMS.forEach(ft => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.65rem;';
+    row.innerHTML = `
+      <span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(state.names[ft.id])}</span>
+      <input type="number" class="coin-input" min="1" max="12" value="${state.coinFlip[ft.id]}" data-id="${ft.id}" onchange="updateCoin(this)" title="Coin flip seed" />
+    `;
+    grid.appendChild(row);
+  });
+}
+
 // ── Event Handlers ─────────────────────────────────────────────────────────
 
 function updateRound(sel) {
@@ -618,7 +635,7 @@ function updateGoal(inp) {
 function renameFT(inp) {
   const id = parseInt(inp.dataset.id);
   state.names[id] = inp.value.trim() || FANTASY_TEAMS.find(f => f.id === id).defaultName;
-  save(); renderOrder(); renderGroups(); renderGroupsRO();
+  save(); renderOrder(); renderGroups(); renderGroupsRO(); renderCoinFlips();
 }
 
 function updateCoin(inp) {
@@ -754,6 +771,7 @@ function togglePause() {
 renderOrder();
 renderGroups();
 renderGroupsRO();
+renderCoinFlips();
 syncNow();
 syncTimer = setInterval(syncNow, SYNC_MS);
 </script>
