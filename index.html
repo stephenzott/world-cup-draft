@@ -497,14 +497,13 @@ const ROUND_CHIP = {
 // ── State ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'wcDraft2026';
-let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { results: {}, coinFlip: {}, names: {} };
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { results: {}, coinFlip: {} };
 
 Object.values(GROUPS).flat().forEach(t => {
   if (!state.results[t]) state.results[t] = { round: -1, gf: 0, ga: 0 };
 });
 FANTASY_TEAMS.forEach(ft => {
   if (state.coinFlip[ft.id] == null) state.coinFlip[ft.id] = ft.id;
-  if (!state.names[ft.id]) state.names[ft.id] = ft.defaultName;
 });
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -535,7 +534,7 @@ function calcScore(ft) {
 function sortOrder() {
   return FANTASY_TEAMS.map(ft => ({
     ...ft,
-    name:     state.names[ft.id],
+    name:     ft.defaultName,
     score:    calcScore(ft),
     coinFlip: state.coinFlip[ft.id],
   })).sort((a, b) => {
@@ -548,7 +547,7 @@ function sortOrder() {
 
 function ownerName(team) {
   const ft = FANTASY_TEAMS.find(f => f.teams.includes(team));
-  return ft ? (state.names[ft.id] || ft.defaultName) : '?';
+  return ft ? ft.defaultName : '?';
 }
 
 // ── Render Draft Order ─────────────────────────────────────────────────────
@@ -675,7 +674,7 @@ function renderCoinFlips() {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.65rem;';
     row.innerHTML = `
-      <span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(state.names[ft.id])}</span>
+      <span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(ft.defaultName)}</span>
       <input type="number" class="coin-input" min="1" max="12" value="${state.coinFlip[ft.id]}" data-id="${ft.id}" onchange="updateCoin(this)" title="Coin flip seed" />
     `;
     grid.appendChild(row);
