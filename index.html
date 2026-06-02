@@ -299,7 +299,7 @@
 <body>
 
 <header>
-  <h1>&#9917; 2026 FIFA World Cup &mdash; Fantasy Draft Order</h1>
+  <h1><a href="https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/standings" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;"><img src="trophy.png" alt="FIFA World Cup Trophy" style="height:2rem;margin-right:0.5rem;vertical-align:middle;"></a>2026 FIFA World Cup &mdash; Fantasy Draft Order</h1>
   <p>Updates live as results are entered &nbsp;&bull;&nbsp; Data saved in browser</p>
   <div class="sync-bar">
     <span id="sync-status" class="sync-pill sync-waiting">&#9679; Waiting for 2026 data</span>
@@ -310,7 +310,7 @@
 
 <div class="container">
 
-  <nav class="tabs-nav">
+  <nav class="tabs-nav" id="tabs-nav" style="display:none">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
   </nav>
@@ -660,11 +660,23 @@ function renderGroups() {
 function renderCoinFlips() {
   const grid = document.getElementById('coin-flip-grid');
   grid.innerHTML = '';
+  const order = sortOrder();
+  const tiedIds = new Set();
+  order.forEach((ft, i) => {
+    const tied = (other) =>
+      ft.score.maxRound    === other.score.maxRound &&
+      ft.score.totalRounds === other.score.totalRounds &&
+      ft.score.totalGD     === other.score.totalGD;
+    if ((i > 0 && tied(order[i - 1])) || (i < order.length - 1 && tied(order[i + 1]))) {
+      tiedIds.add(ft.id);
+    }
+  });
   FANTASY_TEAMS.forEach(ft => {
+    const asterisk = tiedIds.has(ft.id) ? ' <span style="color:var(--gold);font-weight:700;">*</span>' : '';
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.65rem;';
     row.innerHTML = `
-      <span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(ft.defaultName)}</span>
+      <span style="flex:1;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(ft.defaultName)}${asterisk}</span>
       <input type="number" class="coin-input" min="1" max="12" value="${state.coinFlip[ft.id]}" data-id="${ft.id}" onchange="updateCoin(this)" title="Coin flip seed" />
     `;
     grid.appendChild(row);
@@ -686,7 +698,7 @@ function updateGoal(inp) {
 
 function updateCoin(inp) {
   state.coinFlip[parseInt(inp.dataset.id)] = parseInt(inp.value) || 1;
-  save(); renderOrder();
+  save(); renderOrder(); renderCoinFlips();
 }
 
 function esc(s) {
@@ -822,6 +834,7 @@ syncNow();
 syncTimer = setInterval(syncNow, SYNC_MS);
 
 if (new URLSearchParams(location.search).has('admin')) {
+  document.getElementById('tabs-nav').style.display = '';
   document.getElementById('manual-tab-btn').style.display = '';
 }
 </script>
