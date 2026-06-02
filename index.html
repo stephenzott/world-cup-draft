@@ -209,11 +209,11 @@
       overflow: hidden;
     }
     .group-header {
-      background: var(--gold);
+      background: var(--border);
       padding: 0.45rem 0.75rem;
       font-weight: 800;
       font-size: 0.8rem;
-      color: #111111;
+      color: #ffffff;
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
@@ -422,6 +422,57 @@ const ROUND_OPTIONS = [
   { v:  7, label: 'Champion' },
 ];
 
+const FLAGS = {
+  'Argentina':               '🇦🇷',
+  'Morocco':                 '🇲🇦',
+  "Côte d'Ivoire":           '🇨🇮',
+  'New Zealand':             '🇳🇿',
+  'Belgium':                 '🇧🇪',
+  'Croatia':                 '🇭🇷',
+  'Saudi Arabia':            '🇸🇦',
+  'DR Congo':                '🇨🇩',
+  'Mexico':                  '🇲🇽',
+  'Austria':                 '🇦🇹',
+  'Uzbekistan':              '🇺🇿',
+  'Haiti':                   '🇭🇹',
+  'Netherlands':             '🇳🇱',
+  'Australia':               '🇦🇺',
+  'Scotland':                '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'Ghana':                   '🇬🇭',
+  'Canada':                  '🇨🇦',
+  'Senegal':                 '🇸🇳',
+  'Algeria':                 '🇩🇿',
+  'Turkey':                  '🇹🇷',
+  'France':                  '🇫🇷',
+  'Uruguay':                 '🇺🇾',
+  'Paraguay':                '🇵🇾',
+  'Sweden':                  '🇸🇪',
+  'Spain':                   '🇪🇸',
+  'Iran':                    '🇮🇷',
+  'Panama':                  '🇵🇦',
+  'Iraq':                    '🇮🇶',
+  'Brazil':                  '🇧🇷',
+  'Korea Republic':          '🇰🇷',
+  'Egypt':                   '🇪🇬',
+  'Curaçao':                 '🇨🇼',
+  'England':                 '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Japan':                   '🇯🇵',
+  'Qatar':                   '🇶🇦',
+  'Czechia':                 '🇨🇿',
+  'USA':                     '🇺🇸',
+  'Switzerland':             '🇨🇭',
+  'Norway':                  '🇳🇴',
+  'Jordan':                  '🇯🇴',
+  'Germany':                 '🇩🇪',
+  'Colombia':                '🇨🇴',
+  'Tunisia':                 '🇹🇳',
+  'Cape Verde':              '🇨🇻',
+  'Portugal':                '🇵🇹',
+  'Ecuador':                 '🇪🇨',
+  'South Africa':            '🇿🇦',
+  'Bosnia and Herzegovina':  '🇧🇦',
+};
+
 const ROUND_CHIP = {
   '-1': ['chip-tbd',   '—'],
   '0':  ['chip-out',   'Group'],
@@ -518,8 +569,8 @@ function renderOrder() {
     const chips = ft.teams.map(t => {
       const r = state.results[t] || { round: -1 };
       const [cc, cl] = ROUND_CHIP[String(r.round)] || ROUND_CHIP['-1'];
-      const short = t.length > 12 ? t.slice(0, 11) + '…' : t;
-      return `<span class="chip ${cc}" title="${t}">${short}: ${cl}</span>`;
+      const flag = FLAGS[t] || '🏳';
+      return `<span class="chip ${cc}" title="${t}">${flag} ${cl}</span>`;
     }).join('');
 
     const tr = document.createElement('tr');
