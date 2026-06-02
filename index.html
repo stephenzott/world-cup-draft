@@ -108,21 +108,10 @@
     .r2 { color: var(--border); }
     .r3 { color: var(--red); }
 
-    .ft-name input {
-      background: transparent;
-      border: none;
-      border-bottom: 1px dashed transparent;
+    .ft-name span {
       color: var(--text);
       font-weight: 600;
       font-size: 0.88rem;
-      font-family: inherit;
-      width: 180px;
-      cursor: text;
-      padding: 0;
-    }
-    .ft-name input:hover, .ft-name input:focus {
-      border-bottom-color: var(--accent);
-      outline: none;
     }
 
     .wc-chips { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; }
@@ -190,7 +179,6 @@
       .draft-table th:nth-child(5),
       .draft-table td:nth-child(4),
       .draft-table td:nth-child(5) { display: none; }
-      .ft-name input { width: 100%; }
     }
     @media (max-width: 480px) {
       .groups-grid-ro, .groups-grid { grid-template-columns: 1fr; }
@@ -367,7 +355,7 @@
         <tbody id="order-body"></tbody>
       </table>
       </table></div>
-      <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip &nbsp;|&nbsp; Click team names to rename</p>
+      <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip</p>
     </section>
 
     <section>
@@ -599,7 +587,7 @@ function renderOrder() {
       <td class="${rankCls}">${i + 1}</td>
       <td>
         <div class="ft-name">
-          <input type="text" value="${esc(ft.name)}" data-id="${ft.id}" onchange="renameFT(this)" />
+          <span>${esc(ft.name)}</span>
           ${tiedTag}
         </div>
         <div class="wc-chips">${chips}</div>
@@ -706,11 +694,6 @@ function updateGoal(inp) {
   save(); renderOrder();
 }
 
-function renameFT(inp) {
-  const id = parseInt(inp.dataset.id);
-  state.names[id] = inp.value.trim() || FANTASY_TEAMS.find(f => f.id === id).defaultName;
-  save(); renderOrder(); renderGroups(); renderGroupsRO(); renderCoinFlips();
-}
 
 function updateCoin(inp) {
   state.coinFlip[parseInt(inp.dataset.id)] = parseInt(inp.value) || 1;
