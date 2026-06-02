@@ -6,16 +6,16 @@
   <title>2026 World Cup Fantasy Draft Order</title>
   <style>
     :root {
-      --bg: #0a0e1a;
-      --surface: #141929;
-      --surface2: #1e2640;
-      --accent: #00d4aa;
-      --gold: #e8b84b;
-      --text: #e8eaf0;
-      --muted: #8892a4;
-      --red: #e05252;
-      --green: #52c478;
-      --border: #2a3352;
+      --bg:      #f5f5f5;
+      --surface: #ffffff;
+      --surface2:#eeeeee;
+      --accent:  #6300e9;
+      --gold:    #ecff43;
+      --text:    #111111;
+      --muted:   #666666;
+      --red:     #ce0f11;
+      --green:   #1a7a3a;
+      --border:  #304fff;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,14 +28,14 @@
     }
 
     header {
-      background: linear-gradient(135deg, #0d1b3e 0%, #1a3a6b 100%);
+      background: #111111;
       padding: 1.5rem 2rem;
-      border-bottom: 2px solid var(--accent);
+      border-bottom: 3px solid var(--border);
       text-align: center;
     }
 
-    header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
-    header p { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: var(--gold); letter-spacing: 0.05em; }
+    header p { color: #999999; font-size: 0.85rem; margin-top: 0.3rem; }
 
     .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
 
@@ -46,7 +46,7 @@
       letter-spacing: 0.12em;
       margin-bottom: 1rem;
       padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 2px solid var(--border);
     }
 
     section { margin-bottom: 2.5rem; }
@@ -54,22 +54,22 @@
     /* ── Tabs ── */
     .tabs-nav {
       display: flex;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 2px solid var(--border);
       margin-bottom: 1.75rem;
     }
     .tab-btn {
       background: none;
       border: none;
-      border-bottom: 2px solid transparent;
+      border-bottom: 3px solid transparent;
       color: var(--muted);
       font-family: inherit;
       font-size: 0.82rem;
-      font-weight: 600;
+      font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       padding: 0.7rem 1.4rem;
       cursor: pointer;
-      margin-bottom: -1px;
+      margin-bottom: -2px;
       transition: color 0.15s, border-color 0.15s;
     }
     .tab-btn:hover { color: var(--text); }
@@ -78,7 +78,7 @@
     .tab-panel.active { display: block; }
 
     /* ── Draft Order Table ── */
-    .draft-table { width: 100%; border-collapse: collapse; }
+    .draft-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 
     .draft-table th {
       background: var(--surface2);
@@ -88,24 +88,25 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
-      font-weight: 600;
+      font-weight: 700;
+      border-bottom: 2px solid var(--border);
     }
 
     .draft-table td {
       padding: 0.65rem 0.9rem;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #d4d9ff;
       background: var(--surface);
       font-size: 0.88rem;
       vertical-align: middle;
     }
 
     .draft-table tr:last-child td { border-bottom: none; }
-    .draft-table tr:hover td { background: var(--surface2); }
+    .draft-table tr:hover td { background: #f0f2ff; }
 
-    .rank-cell { font-weight: 700; font-size: 1rem; color: var(--muted); width: 2.5rem; text-align: center; }
-    .r1 { color: #ffd700; }
-    .r2 { color: #c0c0c0; }
-    .r3 { color: #cd7f32; }
+    .rank-cell { font-weight: 800; font-size: 1rem; color: var(--muted); width: 2.5rem; text-align: center; }
+    .r1 { color: var(--accent); }
+    .r2 { color: var(--border); }
+    .r3 { color: var(--red); }
 
     .ft-name input {
       background: transparent;
@@ -130,23 +131,23 @@
       font-size: 0.65rem;
       padding: 0.1rem 0.35rem;
       border-radius: 3px;
-      font-weight: 600;
+      font-weight: 700;
       white-space: nowrap;
     }
-    .chip-tbd    { background: #1e2640; color: var(--muted); }
-    .chip-out    { background: #2a1818; color: #e07070; }
-    .chip-r32    { background: #1a1a2e; color: #8888cc; }
-    .chip-r16    { background: #0a1e2e; color: #5aabcc; }
-    .chip-qf     { background: #0d2a1a; color: #52c478; }
-    .chip-4th    { background: #1e1a0a; color: #9a7a30; }
-    .chip-3rd    { background: #2a1e00; color: #cd7f32; }
-    .chip-final  { background: #2a2020; color: #d0d0d0; }
-    .chip-champ  { background: #2a2200; color: #ffd700; }
+    .chip-tbd    { background: #e8e8e8; color: #888888; }
+    .chip-out    { background: #fce8e8; color: var(--red); }
+    .chip-r32    { background: #eae8ff; color: var(--accent); }
+    .chip-r16    { background: #e8ecff; color: var(--border); }
+    .chip-qf     { background: #e8f5ee; color: #1a7a3a; }
+    .chip-4th    { background: #fefce8; color: #8a7200; }
+    .chip-3rd    { background: var(--gold); color: #111111; }
+    .chip-final  { background: #ebebeb; color: #444444; }
+    .chip-champ  { background: var(--gold); color: #111111; outline: 2px solid #111; outline-offset: -2px; }
 
     .stat-cell { text-align: center; font-size: 0.85rem; min-width: 4rem; }
     .stat-na { color: var(--muted); }
-    .gd-pos { color: var(--green); }
-    .gd-neg { color: var(--red); }
+    .gd-pos { color: var(--green); font-weight: 600; }
+    .gd-neg { color: var(--red); font-weight: 600; }
     .gd-zero { color: var(--muted); }
 
     .coin-input {
@@ -164,12 +165,12 @@
 
     .tied-tag {
       font-size: 0.62rem;
-      color: var(--gold);
-      background: #1e1800;
-      border: 1px solid #3a3200;
+      color: #111111;
+      background: var(--gold);
       border-radius: 3px;
-      padding: 0.1rem 0.3rem;
+      padding: 0.1rem 0.35rem;
       margin-left: 0.4rem;
+      font-weight: 700;
       vertical-align: middle;
     }
 
@@ -190,7 +191,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.42rem 0.75rem;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #d4d9ff;
       gap: 0.5rem;
     }
     .team-row-ro:last-child { border-bottom: none; }
@@ -208,11 +209,11 @@
       overflow: hidden;
     }
     .group-header {
-      background: var(--surface2);
+      background: var(--gold);
       padding: 0.45rem 0.75rem;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 0.8rem;
-      color: var(--gold);
+      color: #111111;
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
@@ -222,15 +223,15 @@
       align-items: center;
       gap: 0.4rem;
       padding: 0.45rem 0.75rem;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #d4d9ff;
     }
     .team-row:last-child { border-bottom: none; }
 
-    .team-label { font-size: 0.8rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .team-label { font-size: 0.8rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
     .owner-label { font-size: 0.62rem; color: var(--muted); margin-top: 0.1rem; }
 
     select {
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: 4px;
@@ -244,7 +245,7 @@
     .goals-wrap { display: flex; align-items: center; gap: 3px; }
     .goals-wrap input {
       width: 36px;
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: 4px;
@@ -278,21 +279,22 @@
       padding: 0.2rem 0.65rem;
       border-radius: 20px;
       font-size: 0.72rem;
-      font-weight: 500;
+      font-weight: 600;
     }
-    .sync-waiting { background: #1e1800; color: var(--gold); border: 1px solid #3a3200; }
-    .sync-syncing { background: #0a1e2e; color: #5aabcc; border: 1px solid #1a3a52; }
-    .sync-ok      { background: #0d2a1a; color: var(--green); border: 1px solid #1a4a2a; }
-    .sync-error   { background: #2a1010; color: var(--red); border: 1px solid #4a2020; }
+    .sync-waiting { background: #fefce8; color: #7a6500; border: 1px solid #c8b800; }
+    .sync-syncing { background: #e8ecff; color: var(--border); border: 1px solid var(--border); }
+    .sync-ok      { background: #e8f5ee; color: var(--green); border: 1px solid var(--green); }
+    .sync-error   { background: #fce8e8; color: var(--red); border: 1px solid var(--red); }
     .sync-btn {
       background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
+      border: 1px solid #999;
+      color: #999;
       border-radius: 4px;
       padding: 0.2rem 0.6rem;
       font-size: 0.72rem;
       cursor: pointer;
       font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
     }
     .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
