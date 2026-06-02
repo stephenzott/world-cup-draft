@@ -51,6 +51,32 @@
 
     section { margin-bottom: 2.5rem; }
 
+    /* ── Tabs ── */
+    .tabs-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.75rem;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.7rem 1.4rem;
+      cursor: pointer;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     /* ── Draft Order Table ── */
     .draft-table { width: 100%; border-collapse: collapse; }
 
@@ -75,7 +101,6 @@
 
     .draft-table tr:last-child td { border-bottom: none; }
     .draft-table tr:hover td { background: var(--surface2); }
-    .draft-table th:first-child, .draft-table td:first-child { border-radius: 0; }
 
     .rank-cell { font-weight: 700; font-size: 1rem; color: var(--muted); width: 2.5rem; text-align: center; }
     .r1 { color: #ffd700; }
@@ -147,20 +172,40 @@
       vertical-align: middle;
     }
 
-    /* ── Groups Grid ── */
+    /* ── Read-only groups (Draft Order tab) ── */
+    .groups-grid-ro {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .group-card-ro {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .team-row-ro {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.42rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      gap: 0.5rem;
+    }
+    .team-row-ro:last-child { border-bottom: none; }
+
+    /* ── Manual Entry groups (Manual Entry tab) ── */
     .groups-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
       gap: 0.9rem;
     }
-
     .group-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
     }
-
     .group-header {
       background: var(--surface2);
       padding: 0.45rem 0.75rem;
@@ -170,7 +215,6 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
-
     .team-row {
       display: grid;
       grid-template-columns: 1fr 110px 88px;
@@ -266,38 +310,61 @@
 
 <div class="container">
 
-  <section>
-    <h2>Draft Order</h2>
-    <div class="legend">
-      <span class="legend-item"><span class="chip chip-tbd">—</span> Not started</span>
-      <span class="legend-item"><span class="chip chip-out">Group</span> Group stage exit</span>
-      <span class="legend-item"><span class="chip chip-r32">R32</span></span>
-      <span class="legend-item"><span class="chip chip-r16">R16</span></span>
-      <span class="legend-item"><span class="chip chip-qf">QF</span></span>
-      <span class="legend-item"><span class="chip chip-sf">SF</span></span>
-      <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
-      <span class="legend-item"><span class="chip chip-champ">&#127942;</span> Champion</span>
-    </div>
-    <table class="draft-table">
-      <thead>
-        <tr>
-          <th style="text-align:center">#</th>
-          <th>Fantasy Team</th>
-          <th style="text-align:center">Best Result</th>
-          <th style="text-align:center">Total Rounds</th>
-          <th style="text-align:center">Total GD</th>
-          <th style="text-align:center" title="Lower number = earlier in coin-flip sequence">Coin Flip</th>
-        </tr>
-      </thead>
-      <tbody id="order-body"></tbody>
-    </table>
-    <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip &nbsp;|&nbsp; Click team names to rename</p>
-  </section>
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
+    <button class="tab-btn" onclick="showTab('manual')">Manual Entry</button>
+  </nav>
 
-  <section>
-    <h2>Tournament Results</h2>
-    <div class="groups-grid" id="groups-grid"></div>
-  </section>
+  <!-- ── Tab: Draft Order ── -->
+  <div class="tab-panel active" id="tab-order">
+
+    <section>
+      <h2>Draft Order</h2>
+      <div class="legend">
+        <span class="legend-item"><span class="chip chip-tbd">—</span> Not started</span>
+        <span class="legend-item"><span class="chip chip-out">Group</span> Group stage exit</span>
+        <span class="legend-item"><span class="chip chip-r32">R32</span></span>
+        <span class="legend-item"><span class="chip chip-r16">R16</span></span>
+        <span class="legend-item"><span class="chip chip-qf">QF</span></span>
+        <span class="legend-item"><span class="chip chip-sf">SF</span></span>
+        <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
+        <span class="legend-item"><span class="chip chip-champ">&#127942;</span> Champion</span>
+      </div>
+      <table class="draft-table">
+        <thead>
+          <tr>
+            <th style="text-align:center">#</th>
+            <th>Fantasy Team</th>
+            <th style="text-align:center">Best Result</th>
+            <th style="text-align:center">Total Rounds</th>
+            <th style="text-align:center">Total GD</th>
+            <th style="text-align:center" title="Lower number = earlier in coin-flip sequence">Coin Flip</th>
+          </tr>
+        </thead>
+        <tbody id="order-body"></tbody>
+      </table>
+      <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip &nbsp;|&nbsp; Click team names to rename</p>
+    </section>
+
+    <section>
+      <h2>World Cup Groups</h2>
+      <div class="groups-grid-ro" id="groups-ro"></div>
+    </section>
+
+  </div>
+
+  <!-- ── Tab: Manual Entry ── -->
+  <div class="tab-panel" id="tab-manual">
+
+    <section>
+      <h2>Manual Entry</h2>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;">
+        Override or supplement API data. Changes save automatically and update the draft order.
+      </p>
+      <div class="groups-grid" id="groups-grid"></div>
+    </section>
+
+  </div>
 
 </div>
 
@@ -369,6 +436,17 @@ FANTASY_TEAMS.forEach(ft => {
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
+// ── Tabs ───────────────────────────────────────────────────────────────────
+
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(name === 'order' ? 'draft' : 'manual'));
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === `tab-${name}`);
+  });
+}
+
 // ── Scoring ────────────────────────────────────────────────────────────────
 
 function calcScore(ft) {
@@ -414,7 +492,6 @@ function renderOrder() {
     const gdCls = s.totalGD > 0 ? 'gd-pos' : s.totalGD < 0 ? 'gd-neg' : 'gd-zero';
     const rankCls = i === 0 ? 'rank-cell r1' : i === 1 ? 'rank-cell r2' : i === 2 ? 'rank-cell r3' : 'rank-cell';
 
-    // Check if tied with previous on all non-coin-flip criteria
     let tiedTag = '';
     if (i > 0) {
       const prev = order[i - 1];
@@ -456,7 +533,36 @@ function renderOrder() {
   });
 }
 
-// ── Render Groups ──────────────────────────────────────────────────────────
+// ── Render Groups (read-only) ──────────────────────────────────────────────
+
+function renderGroupsRO() {
+  const grid = document.getElementById('groups-ro');
+  grid.innerHTML = '';
+
+  Object.entries(GROUPS).forEach(([grp, teams]) => {
+    const card = document.createElement('div');
+    card.className = 'group-card-ro';
+
+    const rows = teams.map(team => {
+      const r = state.results[team] || { round: -1 };
+      const [cc, cl] = ROUND_CHIP[String(r.round)] || ROUND_CHIP['-1'];
+      return `
+        <div class="team-row-ro">
+          <div>
+            <div class="team-label">${esc(team)}</div>
+            <div class="owner-label">${esc(ownerName(team))}</div>
+          </div>
+          <span class="chip ${cc}">${cl}</span>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = `<div class="group-header">Group ${grp}</div>${rows}`;
+    grid.appendChild(card);
+  });
+}
+
+// ── Render Groups (manual entry) ──────────────────────────────────────────
 
 function renderGroups() {
   const grid = document.getElementById('groups-grid');
@@ -497,7 +603,7 @@ function renderGroups() {
 
 function updateRound(sel) {
   state.results[sel.dataset.team].round = parseInt(sel.value);
-  save(); renderOrder();
+  save(); renderOrder(); renderGroupsRO();
 }
 
 function updateGoal(inp) {
@@ -508,7 +614,7 @@ function updateGoal(inp) {
 function renameFT(inp) {
   const id = parseInt(inp.dataset.id);
   state.names[id] = inp.value.trim() || FANTASY_TEAMS.find(f => f.id === id).defaultName;
-  save(); renderOrder(); renderGroups();
+  save(); renderOrder(); renderGroups(); renderGroupsRO();
 }
 
 function updateCoin(inp) {
@@ -523,9 +629,8 @@ function esc(s) {
 // ── API Sync ───────────────────────────────────────────────────────────────
 
 const API_BASE = 'https://worldcupjson.net';
-const SYNC_MS   = 90_000; // 90s — well within the 10 req/min rate limit
+const SYNC_MS   = 90_000;
 
-// Map API team names → app names for cases that differ
 const API_NAME_MAP = {
   'United States':                    'USA',
   'United States of America':         'USA',
@@ -542,7 +647,6 @@ const API_NAME_MAP = {
 
 function normName(n) { return API_NAME_MAP[n] || n; }
 
-// Knockout stages, deepest first — win/loss round values match app's ROUND_OPTIONS
 const KO_STAGES = [
   { name: 'Final',                win: 6,    loss: 5 },
   { name: 'Third place play-off', win: 4,    loss: 4 },
@@ -559,11 +663,10 @@ function didWin(match, appName) {
   const hg = match.home_team_goals || 0;
   const ag = match.away_team_goals || 0;
   if (hg !== ag) return isHome ? hg > ag : ag > hg;
-  // Penalty tiebreak (penalties don't count toward GD)
   const hp = match.home_team?.penalties ?? match.home_team_penalties ?? 0;
   const ap = match.away_team?.penalties ?? match.away_team_penalties ?? 0;
   if (hp !== ap) return isHome ? hp > ap : ap > hp;
-  return null; // draw (group stage)
+  return null;
 }
 
 function statsFromMatches(appName, matches) {
@@ -581,20 +684,17 @@ function statsFromMatches(appName, matches) {
   }
 
   let round = -1;
-  // Walk knockout stages deepest → shallowest
   for (const stage of KO_STAGES) {
     const sm = done.find(m => m.stage_name === stage.name);
     if (!sm) continue;
     const won = didWin(sm, appName);
     if (won === false || won === null) { round = stage.loss; break; }
     if (won === true && stage.win !== null) { round = stage.win; break; }
-    // won === true and stage.win === null: still in, keep checking deeper stages
   }
 
-  // No knockout appearance → group stage only
   if (round === -1) {
     const grpDone = done.filter(m => m.stage_name === 'First stage');
-    if (grpDone.length >= 3) round = 0; // didn't advance
+    if (grpDone.length >= 3) round = 0;
   }
 
   return { round, gf, ga };
@@ -611,7 +711,6 @@ async function syncNow() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const matches = await res.json();
 
-    // Guard: only process if data is from the 2026 tournament
     const is2026 = Array.isArray(matches) && matches.some(
       m => m.datetime && new Date(m.datetime) >= new Date('2026-06-11')
     );
@@ -628,7 +727,7 @@ async function syncNow() {
 
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setStatus('ok', `&#10003; Live &mdash; synced ${t}`);
-    if (changed) { save(); renderOrder(); renderGroups(); }
+    if (changed) { save(); renderOrder(); renderGroups(); renderGroupsRO(); }
   } catch (e) {
     setStatus('error', `&#10007; Sync failed: ${e.message}`);
   }
@@ -650,6 +749,7 @@ function togglePause() {
 
 renderOrder();
 renderGroups();
+renderGroupsRO();
 syncNow();
 syncTimer = setInterval(syncNow, SYNC_MS);
 </script>
