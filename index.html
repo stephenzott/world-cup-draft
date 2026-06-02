@@ -138,7 +138,8 @@
     .chip-r32    { background: #1a1a2e; color: #8888cc; }
     .chip-r16    { background: #0a1e2e; color: #5aabcc; }
     .chip-qf     { background: #0d2a1a; color: #52c478; }
-    .chip-sf     { background: #2a1e00; color: #e8a020; }
+    .chip-4th    { background: #1e1a0a; color: #9a7a30; }
+    .chip-3rd    { background: #2a1e00; color: #cd7f32; }
     .chip-final  { background: #2a2020; color: #d0d0d0; }
     .chip-champ  { background: #2a2200; color: #ffd700; }
 
@@ -322,11 +323,12 @@
       <h2>Draft Order</h2>
       <div class="legend">
         <span class="legend-item"><span class="chip chip-tbd">—</span> Not started</span>
-        <span class="legend-item"><span class="chip chip-out">Group</span> Group stage exit</span>
+        <span class="legend-item"><span class="chip chip-out">Group</span> Group exit</span>
         <span class="legend-item"><span class="chip chip-r32">R32</span></span>
         <span class="legend-item"><span class="chip chip-r16">R16</span></span>
         <span class="legend-item"><span class="chip chip-qf">QF</span></span>
-        <span class="legend-item"><span class="chip chip-sf">SF</span></span>
+        <span class="legend-item"><span class="chip chip-4th">4th</span> Lost 3rd-place game</span>
+        <span class="legend-item"><span class="chip chip-3rd">3rd</span> Won 3rd-place game</span>
         <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
         <span class="legend-item"><span class="chip chip-champ">&#127942;</span> Champion</span>
       </div>
@@ -405,9 +407,10 @@ const ROUND_OPTIONS = [
   { v:  1, label: 'Round of 32' },
   { v:  2, label: 'Round of 16' },
   { v:  3, label: 'Quarter-Final' },
-  { v:  4, label: 'Semi-Final' },
-  { v:  5, label: 'Runner-Up' },
-  { v:  6, label: 'Champion' },
+  { v:  4, label: '4th Place' },
+  { v:  5, label: '3rd Place' },
+  { v:  6, label: 'Runner-Up' },
+  { v:  7, label: 'Champion' },
 ];
 
 const ROUND_CHIP = {
@@ -416,9 +419,10 @@ const ROUND_CHIP = {
   '1':  ['chip-r32',   'R32'],
   '2':  ['chip-r16',   'R16'],
   '3':  ['chip-qf',    'QF'],
-  '4':  ['chip-sf',    'SF'],
-  '5':  ['chip-final', 'Final'],
-  '6':  ['chip-champ', '\u{1F3C6}'],
+  '4':  ['chip-4th',   '4th'],
+  '5':  ['chip-3rd',   '3rd'],
+  '6':  ['chip-final', 'Final'],
+  '7':  ['chip-champ', '\u{1F3C6}'],
 };
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -648,9 +652,9 @@ const API_NAME_MAP = {
 function normName(n) { return API_NAME_MAP[n] || n; }
 
 const KO_STAGES = [
-  { name: 'Final',                win: 6,    loss: 5 },
-  { name: 'Third place play-off', win: 4,    loss: 4 },
-  { name: 'Semi-final',           win: null, loss: 4 },
+  { name: 'Final',                win: 7,    loss: 6 },
+  { name: 'Third place play-off', win: 5,    loss: 4 },
+  { name: 'Semi-final',           win: null, loss: 4 }, // temp 4th until 3rd-place match resolves
   { name: 'Semi-finals',          win: null, loss: 4 },
   { name: 'Quarter-final',        win: null, loss: 3 },
   { name: 'Quarter-finals',       win: null, loss: 3 },
