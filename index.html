@@ -185,9 +185,19 @@
     }
     @media (max-width: 768px) {
       .groups-grid-ro, .groups-grid { grid-template-columns: repeat(2, 1fr); }
+      /* Hide less critical columns on tablet */
+      .draft-table th:nth-child(4),
+      .draft-table th:nth-child(5),
+      .draft-table td:nth-child(4),
+      .draft-table td:nth-child(5) { display: none; }
+      .ft-name input { width: 100%; }
     }
     @media (max-width: 480px) {
       .groups-grid-ro, .groups-grid { grid-template-columns: 1fr; }
+      /* Also hide Best Result on mobile — chips show status inline */
+      .draft-table th:nth-child(3),
+      .draft-table td:nth-child(3) { display: none; }
+      .container { padding: 0.75rem; }
     }
     .group-card-ro {
       background: var(--surface);
@@ -343,6 +353,7 @@
         <span class="legend-item"><span class="chip chip-final">Final</span> Runner-Up</span>
         <span class="legend-item"><span class="chip chip-champ">&#127942;</span> Champion</span>
       </div>
+      <div style="overflow-x:auto">
       <table class="draft-table">
         <thead>
           <tr>
@@ -355,6 +366,7 @@
         </thead>
         <tbody id="order-body"></tbody>
       </table>
+      </table></div>
       <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip &nbsp;|&nbsp; Click team names to rename</p>
     </section>
 
