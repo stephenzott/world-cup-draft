@@ -70,8 +70,9 @@ Team names are plain text (not editable).
 Ties are not flagged visually on the public page; coin flip asterisks appear only in the admin coin flip settings.
 
 ### Groups Grid
-- 4 columns default → 3 (≤1100px) → 2 (≤768px) → 1 (≤480px)
-- Read-only view shows team name, owner, and status chip
+- Read-only grid: 3 columns default → 2 (≤1100px) → 2 (≤768px) → 1 (≤480px)
+- Manual entry grid: 4 columns default → 3 (≤1100px) → 2 (≤768px) → 1 (≤480px)
+- Read-only view shows a FIFA-style standings table per group: **Team | Pts | GF | GA | chip**, sorted by Pts → GD → GF. Group-stage stats (W/D/L/GF/GA) are stored in `state.results[team].groupStats` — computed from API group-stage matches only (`stage_name === 'First stage'`), separate from the total-tournament `gf/ga` used for fantasy scoring. If no API data, cells show `—`.
 - Manual entry view adds round dropdown and goals for/against inputs
 - `renderGroups()` (manual entry form) is only rebuilt when switching to the Manual Entry tab or when an API sync fires while that tab is already active — avoids unnecessary DOM reconstruction
 
@@ -104,3 +105,5 @@ Chip styles by round: `chip-tbd`, `chip-out`, `chip-r32`, `chip-r16`, `chip-qf`,
 ## localStorage Key
 
 `wcDraft2026` — stores `{ results, coinFlip }` objects keyed by team name / fantasy team ID. Names are no longer persisted (always read from `defaultName`).
+
+Each `results[team]` entry: `{ round, gf, ga, groupStats }` where `gf/ga` are total-tournament goals (used for fantasy scoring) and `groupStats` is `{ p, w, d, l, gf, ga }` for group-stage matches only (used for the standings display). `groupStats` is `null` until API data arrives.
