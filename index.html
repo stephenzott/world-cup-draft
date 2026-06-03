@@ -297,6 +297,108 @@
       text-align: right;
     }
 
+    /* ── Teams Still Alive ── */
+    .alive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .alive-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+    .alive-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.45rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #e8e8f0;
+    }
+    .alive-owner-name { font-weight: 700; font-size: 0.85rem; }
+    .alive-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 10px;
+    }
+    .alive-badge-in  { background: var(--accent); color: #fff; }
+    .alive-badge-out { background: var(--surface2); color: var(--muted); }
+    .alive-team-row {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.18rem 0;
+      font-size: 0.78rem;
+    }
+    .alive-team-row.team-in  { color: var(--text); font-weight: 500; }
+    .alive-team-row.team-out { color: var(--muted); }
+    .alive-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Bracket ── */
+    .bracket-wrap { overflow-x: auto; padding-bottom: 0.75rem; }
+    .bracket-cols { display: flex; gap: 0.75rem; align-items: flex-start; min-width: max-content; }
+    .bracket-col { width: 200px; flex-shrink: 0; }
+    .bracket-col-header {
+      background: var(--border);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.38rem 0.6rem;
+      border-radius: 5px 5px 0 0;
+      text-align: center;
+    }
+    .bracket-matches { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.35rem; }
+    .match-card {
+      background: var(--surface);
+      border: 1px solid #d4d9ff;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .match-card.match-live { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+    .match-team-row {
+      display: flex;
+      align-items: center;
+      gap: 0.28rem;
+      padding: 0.32rem 0.45rem;
+    }
+    .match-team-row + .match-team-row { border-top: 1px solid #f0f2ff; }
+    .match-team-row.mt-winner { background: #f0f7f2; }
+    .match-team-row.mt-loser  { opacity: 0.55; }
+    .match-team-row.mt-tbd    { background: var(--surface2); }
+    .match-flag { font-size: 0.95rem; flex-shrink: 0; }
+    .match-info { flex: 1; min-width: 0; }
+    .match-name  { font-size: 0.73rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .match-owner { font-size: 0.58rem; color: var(--muted); white-space: nowrap; display: block; }
+    .match-score { font-size: 0.85rem; font-weight: 800; min-width: 1.1rem; text-align: right; flex-shrink: 0; }
+    .ms-win  { color: var(--text); }
+    .ms-loss { color: var(--muted); }
+    .match-placeholder {
+      background: var(--surface2);
+      border: 1px dashed #ccc;
+      border-radius: 5px;
+      padding: 0.9rem 0.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+    .third-place-sep {
+      margin-top: 0.75rem;
+      padding-top: 0.35rem;
+      border-top: 1px dashed #ccc;
+      text-align: center;
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 700;
+    }
+
     /* ── Sync bar ── */
     .sync-bar { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .sync-pill {
@@ -339,8 +441,9 @@
 
 <div class="container">
 
-  <nav class="tabs-nav" id="tabs-nav" style="display:none">
+  <nav class="tabs-nav" id="tabs-nav">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
+    <button class="tab-btn" onclick="showTab('bracket')">Bracket</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
   </nav>
 
@@ -402,6 +505,23 @@
         Used only to break ties when all other criteria are equal. Lower number drafts earlier.
       </p>
       <div id="coin-flip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.5rem;"></div>
+    </section>
+
+  </div>
+
+  <!-- ── Tab: Bracket ── -->
+  <div class="tab-panel" id="tab-bracket">
+
+    <section>
+      <h2>Teams Still Alive</h2>
+      <div class="alive-grid" id="alive-grid"></div>
+    </section>
+
+    <section>
+      <h2>Knockout Bracket</h2>
+      <div class="bracket-wrap">
+        <div class="bracket-cols" id="bracket-cols"></div>
+      </div>
     </section>
 
   </div>
@@ -520,6 +640,7 @@ const ROUND_CHIP = {
 
 const STORAGE_KEY = 'wcDraft2026';
 let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { results: {}, coinFlip: {} };
+let bracketMatches = [];
 
 Object.values(GROUPS).flat().forEach(t => {
   if (!state.results[t]) state.results[t] = { round: -1, gf: 0, ga: 0 };
@@ -533,13 +654,14 @@ function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 // ── Tabs ───────────────────────────────────────────────────────────────────
 
 function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(name === 'order' ? 'draft' : 'manual'));
-  });
-  document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.id === `tab-${name}`);
+    const m = b.getAttribute('onclick')?.match(/showTab\('(\w+)'\)/);
+    b.classList.toggle('active', m?.[1] === name);
   });
   if (name === 'manual') renderGroups();
+  if (name === 'bracket') renderBracket();
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -637,6 +759,7 @@ function renderOrder() {
     tbody.appendChild(tr);
   });
   renderStage();
+  renderAlive();
 }
 
 // ── Render Groups (read-only) ──────────────────────────────────────────────
@@ -785,6 +908,116 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Bracket ───────────────────────────────────────────────────────────────
+
+function renderAlive() {
+  const grid = document.getElementById('alive-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  FANTASY_TEAMS.forEach(ft => {
+    const alive = ft.teams.filter(t => (state.results[t]?.round ?? -1) === -1);
+    const badgeCls = alive.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
+    const rows = ft.teams.map(t => {
+      const round = state.results[t]?.round ?? -1;
+      const isIn = round === -1;
+      const [cc, cl] = ROUND_CHIP[String(round)] || ROUND_CHIP['-1'];
+      const flag = FLAGS[t] || '🏳';
+      return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
+        <span>${flag}</span>
+        <span class="alive-team-name">${esc(t)}</span>
+        ${!isIn ? `<span class="chip ${cc} chip-sm">${cl}</span>` : ''}
+      </div>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'alive-card';
+    card.innerHTML = `
+      <div class="alive-card-header">
+        <span class="alive-owner-name">${esc(ft.defaultName)}</span>
+        <span class="alive-badge ${badgeCls}">${alive.length}/4</span>
+      </div>${rows}`;
+    grid.appendChild(card);
+  });
+}
+
+function buildMatchCard(m) {
+  const ht = normName(m.home_team?.name || '');
+  const at = normName(m.away_team?.name || '');
+  const hg = m.home_team?.goals ?? m.home_team_goals ?? null;
+  const ag = m.away_team?.goals ?? m.away_team_goals ?? null;
+  const done = m.status === 'completed';
+  const live = m.status === 'in progress' || m.status === 'in_progress';
+  const winner = m.winner ? normName(m.winner) : null;
+
+  function row(name, goals) {
+    const isWin  = winner && name && name === winner;
+    const isLoss = winner && name && name !== winner;
+    const cls    = !name ? 'mt-tbd' : isWin ? 'mt-winner' : isLoss ? 'mt-loser' : '';
+    const flag   = name ? (FLAGS[name] || '🏳') : '';
+    const owner  = name ? ownerName(name) : '';
+    const scoreHTML = (done || live) && goals !== null
+      ? `<span class="match-score ${isWin ? 'ms-win' : 'ms-loss'}">${goals}</span>` : '';
+    return `<div class="match-team-row ${cls}">
+      <span class="match-flag">${flag}</span>
+      <div class="match-info">
+        <span class="match-name">${name ? esc(name) : 'TBD'}</span>
+        ${owner && owner !== '?' ? `<span class="match-owner">${esc(owner)}</span>` : ''}
+      </div>${scoreHTML}
+    </div>`;
+  }
+  return `<div class="match-card${live ? ' match-live' : ''}">
+    ${row(ht, hg)}${row(at, ag)}
+  </div>`;
+}
+
+function renderBracketCols() {
+  const container = document.getElementById('bracket-cols');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const STAGES = [
+    { names: ['Round of 32'],                       label: 'R32',   count: 16 },
+    { names: ['Round of 16'],                       label: 'R16',   count: 8  },
+    { names: ['Quarter-final','Quarter-finals'],    label: 'QF',    count: 4  },
+    { names: ['Semi-final','Semi-finals'],          label: 'SF',    count: 2  },
+    { names: ['Final'],                             label: 'Final', count: 1  },
+  ];
+  const THIRD = new Set(['Play-off for third place','Third place play-off']);
+
+  const byStage = {};
+  bracketMatches.forEach(m => {
+    if (!byStage[m.stage_name]) byStage[m.stage_name] = [];
+    byStage[m.stage_name].push(m);
+  });
+  const thirdMatches = bracketMatches.filter(m => THIRD.has(m.stage_name));
+
+  if (!bracketMatches.length) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:1rem 0;">Bracket will populate once 2026 knockout stage data is available.</p>';
+    return;
+  }
+
+  STAGES.forEach(stage => {
+    const stageMatches = stage.names.flatMap(n => byStage[n] || []);
+    const col = document.createElement('div');
+    col.className = 'bracket-col';
+    const needed = Math.max(0, stage.count - stageMatches.length);
+    let html = stageMatches.map(buildMatchCard).join('');
+    for (let i = 0; i < needed; i++) html += `<div class="match-placeholder">TBD</div>`;
+    if (stage.names[0] === 'Final') {
+      const tHTML = thirdMatches.length
+        ? thirdMatches.map(buildMatchCard).join('')
+        : `<div class="match-placeholder">TBD</div>`;
+      html += `<div class="third-place-sep">3rd Place</div>${tHTML}`;
+    }
+    col.innerHTML = `<div class="bracket-col-header">${stage.label}</div><div class="bracket-matches">${html}</div>`;
+    container.appendChild(col);
+  });
+}
+
+function renderBracket() {
+  renderAlive();
+  renderBracketCols();
+}
+
 // ── API Sync ───────────────────────────────────────────────────────────────
 
 const API_BASE = 'https://worldcupjson.net';
@@ -903,6 +1136,11 @@ async function syncNow() {
       if (s) { state.results[team] = { round: s.round, gf: s.gf, ga: s.ga, groupStats: s.groupStats }; changed = true; }
     }
 
+    const KO_STAGE_SET = new Set(['Round of 32','Round of 16','Quarter-final','Quarter-finals','Semi-final','Semi-finals','Final','Play-off for third place','Third place play-off']);
+    const ko = matches.filter(m => KO_STAGE_SET.has(m.stage_name));
+    let bracketChanged = false;
+    if (ko.length) { bracketMatches = ko; bracketChanged = true; }
+
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setStatus('ok', `&#10003; Live &mdash; synced ${t}`);
     if (changed) {
@@ -911,6 +1149,7 @@ async function syncNow() {
       renderGroupsRO();
       if (document.getElementById('tab-manual').classList.contains('active')) renderGroups();
     }
+    if (bracketChanged) renderBracketCols();
   } catch (e) {
     setStatus('error', `&#10007; Sync failed: ${e.message}`);
   }
@@ -938,7 +1177,6 @@ syncNow();
 syncTimer = setInterval(syncNow, SYNC_MS);
 
 if (new URLSearchParams(location.search).has('admin')) {
-  document.getElementById('tabs-nav').style.display = '';
   document.getElementById('manual-tab-btn').style.display = '';
 }
 </script>
