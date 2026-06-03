@@ -7,6 +7,7 @@ Single-file app (`index.html`) for tracking a 12-team fantasy draft during the 2
 - `index.html` — the entire app: HTML, CSS (`<style>`), and JS (`<script>`)
 - `trophy.png` — FIFA World Cup trophy image used in the header (links to FIFA standings)
 - `fantasy_league_assignments.md` — the draft assignments reference doc (12 teams × 4 WC teams each)
+- `draft_preview.html` — styled pre-tournament draft preview page (one card per pick, matches app theme). Linked from a gold button in the header that auto-hides on and after 2026-06-11.
 
 ## Fantasy League Setup
 
@@ -50,10 +51,11 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 ## UI
 
 ### Tabs
-- **Draft Order** — ranked table + read-only groups grid (tab nav hidden on public page)
-- **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds
+- **Draft Order** — ranked table + read-only groups grid
+- **Bracket** — knockout bracket (column-per-round) + Teams Still Alive grid. Public tab. Lives on the `knockout-bracket` branch; scheduled to merge to main the morning of 2026-06-28.
+- **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only.
 
-Tab navigation bar is only shown when `?admin` is in the URL.
+Tab navigation bar is always visible. The Manual Entry tab button is hidden unless `?admin` is in the URL.
 
 ### Header
 A **tournament stage pill** in the sync-bar reflects the current stage derived from the highest round in state: Group Stage → Round of 32 → Round of 16 → Quarter-Finals → Semi-Finals → Final → Complete. Updates every time `renderOrder()` runs.
@@ -76,6 +78,14 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - Manual entry view adds round dropdown and goals for/against inputs
 - `renderGroups()` (manual entry form) is only rebuilt when switching to the Manual Entry tab or when an API sync fires while that tab is already active — avoids unnecessary DOM reconstruction
 
+### Bracket Tab (knockout-bracket branch)
+- Column-per-round layout: R32 → R16 → QF → SF → Final. 3rd place match appears below the Final column. Horizontally scrollable.
+- Each match card shows flag emoji, WC team name, and fantasy owner. Completed matches highlight the winner and dim the loser. Live matches get a green border.
+- TBD slots show placeholder cards until API data arrives. Empty state shows a "waiting for 2026 data" message.
+- **Teams Still Alive** section above the bracket: 12 owner cards in a responsive grid. Each shows the owner's 4 teams with status chips for eliminated teams and an `X/4` alive badge (purple when > 0, gray when 0). A team is "alive" when `round === -1`.
+- `bracketMatches` — module-level array (not persisted to localStorage) populated by `syncNow()` from all KO stage matches. `renderBracketCols()` is called when this updates. `renderAlive()` is called from `renderOrder()` so the alive grid stays current with any result change.
+- KO stage names captured: `Round of 32`, `Round of 16`, `Quarter-final`, `Quarter-finals`, `Semi-final`, `Semi-finals`, `Final`, `Play-off for third place`, `Third place play-off`.
+
 ## Live API Sync
 
 Pulls from `https://worldcupjson.net/matches` every 90 seconds.
@@ -86,6 +96,7 @@ Pulls from `https://worldcupjson.net/matches` every 90 seconds.
 - Team name normalization handles API variants (e.g. "United States" → "USA", "South Korea" → "Korea Republic")
 - KO stage logic correctly resolves 3rd/4th place: 3rd-place game winner = round 5, loser = round 4
 - Manual Entry data is preserved; API only writes when it has completed match data
+- On each sync, KO stage matches are also captured into `bracketMatches` and `renderBracketCols()` is called (bracket tab feature, on `knockout-bracket` branch)
 
 ## Visual Design
 
