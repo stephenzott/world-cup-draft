@@ -48,14 +48,24 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 | 11 | Chambers |
 | 12 | Shane |
 
+## Open Branches
+
+| Branch | Status | Notes |
+|--------|--------|-------|
+| `knockout-bracket` | PR #1 open, auto-merges 2026-06-28 9am ET via scheduled remote agent | Adds public Bracket tab + Teams Still Alive |
+| `opta-predictions` | Parked, no PR | Adds public Odds tab with Opta pre-tournament predictions. Simulator idea shelved pending group interest — would need team strength ratings or per-match odds (stage probabilities we have are simulation outputs, not inputs). |
+
+Both branches also make the tab nav always visible and move Manual Entry to admin-only. Main currently keeps tab nav admin-gated.
+
 ## UI
 
 ### Tabs
 - **Draft Order** — ranked table + read-only groups grid
-- **Bracket** — knockout bracket (column-per-round) + Teams Still Alive grid. Public tab. Lives on the `knockout-bracket` branch; scheduled to merge to main the morning of 2026-06-28.
+- **Bracket** — knockout bracket (column-per-round) + Teams Still Alive grid. Public tab. On `knockout-bracket` branch (merges 2026-06-28).
+- **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public tab. On `opta-predictions` branch (parked).
 - **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only.
 
-Tab navigation bar is always visible. The Manual Entry tab button is hidden unless `?admin` is in the URL.
+On `main`: tab nav is admin-gated (shown only with `?admin`). On feature branches: tab nav always visible, Manual Entry button hidden unless `?admin`.
 
 ### Header
 A **tournament stage pill** in the sync-bar reflects the current stage derived from the highest round in state: Group Stage → Round of 32 → Round of 16 → Quarter-Finals → Semi-Finals → Final → Complete. Updates every time `renderOrder()` runs.
@@ -85,6 +95,14 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - **Teams Still Alive** section above the bracket: 12 owner cards in a responsive grid. Each shows the owner's 4 teams with status chips for eliminated teams and an `X/4` alive badge (purple when > 0, gray when 0). A team is "alive" when `round === -1`.
 - `bracketMatches` — module-level array (not persisted to localStorage) populated by `syncNow()` from all KO stage matches. `renderBracketCols()` is called when this updates. `renderAlive()` is called from `renderOrder()` so the alive grid stays current with any result change.
 - KO stage names captured: `Round of 32`, `Round of 16`, `Quarter-final`, `Quarter-finals`, `Semi-final`, `Semi-finals`, `Final`, `Play-off for third place`, `Third place play-off`.
+
+### Odds Tab (opta-predictions branch)
+- Sortable table: all 48 WC teams × 7 columns — Top Group, R32, R16, QF, SF, Final, 🏆 (champion). Data from Opta via The Analyst, hardcoded pre-tournament (June 2026).
+- Each row shows flag, team name, and fantasy owner. Cells heat-map tinted: green ≥70%, light green ≥40%, light blue ≥15%.
+- `OPTA_ODDS` — constant object keyed by app team name (normalized from Analyst names e.g. "Türkiye"→"Turkey", "Cabo Verde"→"Cape Verde").
+- `ODDS_COLS` — array of `{ key, label }` for the 7 data columns.
+- `oddsSortKey` / `oddsSortDir` — module-level sort state. `sortOddsBy(key)` toggles direction on re-click. Default: champion % descending.
+- `renderOdds()` — lazy, called on tab switch. `fmtPct(v)` formats values: `—` for 0%, `<0.1%` for tiny values.
 
 ## Live API Sync
 
