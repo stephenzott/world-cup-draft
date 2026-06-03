@@ -157,11 +157,12 @@
     /* ── Read-only groups (Draft Order tab) ── */
     .groups-grid-ro {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 0.75rem;
     }
     @media (max-width: 1100px) {
-      .groups-grid-ro, .groups-grid { grid-template-columns: repeat(3, 1fr); }
+      .groups-grid-ro { grid-template-columns: repeat(2, 1fr); }
+      .groups-grid    { grid-template-columns: repeat(3, 1fr); }
     }
     @media (max-width: 768px) {
       .groups-grid-ro, .groups-grid { grid-template-columns: repeat(2, 1fr); }
@@ -184,15 +185,40 @@
       border-radius: 8px;
       overflow: hidden;
     }
-    .team-row-ro {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.42rem 0.75rem;
-      border-bottom: 1px solid #d4d9ff;
-      gap: 0.5rem;
+
+    /* ── Group standings table ── */
+    .group-standings {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
     }
-    .team-row-ro:last-child { border-bottom: none; }
+    .group-standings th {
+      background: rgba(48, 79, 255, 0.07);
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+      padding: 0.22rem 0.25rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #d4d9ff;
+    }
+    .group-standings th.th-team { text-align: left; padding-left: 0.65rem; }
+    .group-standings td {
+      padding: 0.32rem 0.25rem;
+      text-align: center;
+      border-bottom: 1px solid #f0f0f8;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .group-standings td.td-team { text-align: left; padding-left: 0.65rem; padding-right: 0.4rem; }
+    .group-standings tr:last-child td { border-bottom: none; }
+    .group-standings .td-pts { font-weight: 800; color: var(--text); }
+    .group-standings .td-gd-pos { color: var(--green); }
+    .group-standings .td-gd-neg { color: var(--red); }
+    .standings-team { font-size: 0.76rem; font-weight: 500; }
+    .standings-owner { font-size: 0.6rem; color: var(--muted); margin-top: 0.05rem; }
+    .chip-sm { font-size: 0.58rem; padding: 0.1rem 0.28rem; }
 
     /* ── Manual Entry groups (Manual Entry tab) ── */
     .groups-grid {
@@ -623,21 +649,51 @@ function renderGroupsRO() {
     const card = document.createElement('div');
     card.className = 'group-card-ro';
 
-    const rows = teams.map(team => {
-      const r = state.results[team] || { round: -1 };
-      const [cc, cl] = ROUND_CHIP[String(r.round)] || ROUND_CHIP['-1'];
+    const sorted = [...teams].sort((a, b) => {
+      const ga = state.results[a]?.groupStats;
+      const gb = state.results[b]?.groupStats;
+      if (!ga && !gb) return 0;
+      if (!ga) return 1;
+      if (!gb) return -1;
+      const ptsA = ga.w * 3 + ga.d, ptsB = gb.w * 3 + gb.d;
+      if (ptsB !== ptsA) return ptsB - ptsA;
+      const gdA = ga.gf - ga.ga, gdB = gb.gf - gb.ga;
+      if (gdB !== gdA) return gdB - gdA;
+      return gb.gf - ga.gf;
+    });
+
+    const rows = sorted.map(team => {
+      const res = state.results[team] || { round: -1 };
+      const gs = res.groupStats;
+      const [cc, cl] = ROUND_CHIP[String(res.round)] || ROUND_CHIP['-1'];
+      const flag = FLAGS[team] || '🏳';
+      const pts = gs ? gs.w * 3 + gs.d : null;
       return `
-        <div class="team-row-ro">
-          <div>
-            <div class="team-label">${esc(team)}</div>
-            <div class="owner-label">${esc(ownerName(team))}</div>
-          </div>
-          <span class="chip ${cc}">${cl}</span>
-        </div>
+        <tr>
+          <td class="td-team">
+            <div class="standings-team">${flag} ${esc(team)}</div>
+            <div class="standings-owner">${esc(ownerName(team))}</div>
+          </td>
+          <td class="td-pts">${pts !== null ? pts : '—'}</td>
+          <td>${gs ? gs.gf : '—'}</td>
+          <td>${gs ? gs.ga : '—'}</td>
+          <td><span class="chip ${cc} chip-sm">${cl}</span></td>
+        </tr>
       `;
     }).join('');
 
-    card.innerHTML = `<div class="group-header">Group ${grp}</div>${rows}`;
+    card.innerHTML = `
+      <div class="group-header">Group ${grp}</div>
+      <table class="group-standings">
+        <thead>
+          <tr>
+            <th class="th-team">Team</th>
+            <th>Pts</th><th>GF</th><th>GA</th><th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
     grid.appendChild(card);
   });
 }
@@ -802,7 +858,24 @@ function statsFromMatches(appName, matches) {
     if (grpDone.length >= 3) round = 0;
   }
 
-  return { round, gf, ga };
+  const groupDone = done.filter(m => m.stage_name === 'First stage');
+  let groupStats = null;
+  if (groupDone.length) {
+    let w = 0, d = 0, l = 0, ggf = 0, gga = 0;
+    for (const m of groupDone) {
+      const home = normName(m.home_team.name) === appName;
+      const hg = m.home_team_goals || 0;
+      const ag = m.away_team_goals || 0;
+      ggf += home ? hg : ag;
+      gga += home ? ag : hg;
+      if (hg > ag) { if (home) w++; else l++; }
+      else if (hg < ag) { if (home) l++; else w++; }
+      else d++;
+    }
+    groupStats = { p: groupDone.length, w, d, l, gf: ggf, ga: gga };
+  }
+
+  return { round, gf, ga, groupStats };
 }
 
 let syncPaused = false;
@@ -827,7 +900,7 @@ async function syncNow() {
     let changed = false;
     for (const team of Object.values(GROUPS).flat()) {
       const s = statsFromMatches(team, matches);
-      if (s) { state.results[team] = { round: s.round, gf: s.gf, ga: s.ga }; changed = true; }
+      if (s) { state.results[team] = { round: s.round, gf: s.gf, ga: s.ga, groupStats: s.groupStats }; changed = true; }
     }
 
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
