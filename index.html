@@ -1029,11 +1029,10 @@ async function syncNow() {
   if (syncPaused) return;
   setStatus('syncing', '&#8635; Syncing…');
   try {
-    const start = new Date('2026-06-11');
-    const end   = new Date(); end.setDate(end.getDate() + 1);
+    const endStr = espnDateStr(new Date(Date.now() + 86_400_000));
     const dates = [];
-    let cur = new Date(start);
-    while (cur <= end) { dates.push(espnDateStr(cur)); cur.setDate(cur.getDate() + 1); }
+    let cur = new Date('2026-06-11T12:00:00');
+    while (espnDateStr(cur) <= endStr) { dates.push(espnDateStr(cur)); cur.setDate(cur.getDate() + 1); }
 
     const responses = await Promise.all(
       dates.map(d =>
