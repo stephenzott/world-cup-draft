@@ -310,7 +310,13 @@
     .sync-waiting { background: #fefce8; color: #7a6500; border: 1px solid #c8b800; }
     .sync-syncing { background: #e8ecff; color: var(--border); border: 1px solid var(--border); }
     .sync-ok      { background: #e8f5ee; color: var(--green); border: 1px solid var(--green); }
+    .sync-live    { background: #e8f5ee; color: var(--green); border: 1px solid var(--green); animation: livepulse 2s ease-in-out infinite; }
     .sync-error   { background: #fce8e8; color: var(--red); border: 1px solid var(--red); }
+    @keyframes livepulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .rank-arrow { font-size: 0.65rem; font-weight: 700; margin-left: 3px; vertical-align: middle; }
+    .rank-up    { color: var(--green); }
+    .rank-down  { color: var(--red); }
+    .rank-tie   { color: #999; }
     .sync-btn {
       background: transparent;
       border: 1px solid #999;
@@ -658,8 +664,9 @@ function showTab(name) {
 
 // ── Scoring ────────────────────────────────────────────────────────────────
 
-function calcScore(ft) {
-  const rs = ft.teams.map(t => state.results[t] || { round: -1, gf: 0, ga: 0 });
+function calcScore(ft, resultsOverride) {
+  const res = resultsOverride || state.results;
+  const rs = ft.teams.map(t => res[t] || { round: -1, gf: 0, ga: 0 });
   const played = rs.filter(r => r.round >= 0);
   return {
     maxRound:    played.length ? Math.max(...played.map(r => r.round)) : -1,
@@ -668,11 +675,11 @@ function calcScore(ft) {
   };
 }
 
-function sortOrder() {
+function sortOrder(resultsOverride) {
   return FANTASY_TEAMS.map(ft => ({
     ...ft,
     name:     ft.defaultName,
-    score:    calcScore(ft),
+    score:    calcScore(ft, resultsOverride),
     coinFlip: state.coinFlip[ft.id],
   })).sort((a, b) => {
     if (b.score.maxRound    !== a.score.maxRound)    return b.score.maxRound    - a.score.maxRound;
@@ -710,6 +717,7 @@ function renderOrder() {
   const tbody = document.getElementById('order-body');
   tbody.innerHTML = '';
 
+  const hasMovements = Object.keys(rankMovements).length > 0;
   order.forEach((ft, i) => {
     const s = ft.score;
     const [chipCls, chipLbl] = ROUND_CHIP[String(s.maxRound)] || ROUND_CHIP['-1'];
@@ -734,9 +742,17 @@ function renderOrder() {
       return `<span class="chip ${cc}" title="${t}">${flag} ${cl}</span>`;
     }).join('');
 
+    let arrowHtml = '';
+    if (hasMovements) {
+      const mv = rankMovements[ft.id] || 0;
+      if (mv > 0)      arrowHtml = '<span class="rank-arrow rank-up">↑</span>';
+      else if (mv < 0) arrowHtml = '<span class="rank-arrow rank-down">↓</span>';
+      else             arrowHtml = '<span class="rank-arrow rank-tie">—</span>';
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="${rankCls}">${i + 1}</td>
+      <td class="${rankCls}">${i + 1}${arrowHtml}</td>
       <td>
         <div class="ft-name">
           <button class="ft-name-btn" onclick="showOwnerCard(${ft.id})">${esc(ft.name)}</button>
@@ -954,11 +970,12 @@ function normalizeEvent(event, queryDate) {
 
 function statsFromMatches(appName, matches) {
   const mine = matches.filter(m => m.home.name === appName || m.away.name === appName);
-  const done = mine.filter(m => m.completed);
-  if (!done.length) return null;
+  const done   = mine.filter(m => m.completed);
+  const active = mine.filter(m => m.completed || m.state === 'in'); // include live goals
+  if (!active.length) return null;
 
   let gf = 0, ga = 0;
-  for (const m of done) {
+  for (const m of active) {
     const isHome = m.home.name === appName;
     gf += isHome ? m.home.goals : m.away.goals;
     ga += isHome ? m.away.goals : m.home.goals;
@@ -1007,6 +1024,7 @@ let syncPaused    = false;
 let syncTimer     = null;
 let allNormalized = [];
 let scheduleDate  = new Date().toISOString().slice(0, 10);
+let rankMovements = {};
 
 async function syncNow() {
   if (syncPaused) return;
@@ -1048,14 +1066,42 @@ async function syncNow() {
       }
     }
 
+    const hasLive = allNormalized.some(m => m.state === 'in');
+
+    // Compute rank movements by comparing completed-only baseline to live rankings
+    if (hasLive) {
+      const completedOnly = allNormalized.filter(m => m.completed);
+      const baseResults = {};
+      for (const team of Object.values(GROUPS).flat()) {
+        const s = statsFromMatches(team, completedOnly);
+        const prev = state.results[team] || {};
+        baseResults[team] = s
+          ? { round: s.round !== -1 ? s.round : (prev.round ?? -1), gf: s.gf, ga: s.ga }
+          : { ...prev };
+      }
+      const baseOrder = sortOrder(baseResults);
+      const liveOrder = sortOrder();
+      rankMovements = {};
+      liveOrder.forEach((ft, liveIdx) => {
+        const baseIdx = baseOrder.findIndex(b => b.id === ft.id);
+        rankMovements[ft.id] = baseIdx - liveIdx;
+      });
+    } else {
+      rankMovements = {};
+    }
+
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setStatus('ok', `&#10003; Live &mdash; synced ${t}`);
-    if (changed) {
-      save();
+    setStatus(hasLive ? 'live' : 'ok', hasLive ? `&#9679; Live &mdash; games in progress` : `&#10003; Live &mdash; synced ${t}`);
+    if (changed || hasLive) {
+      if (changed) save();
       renderOrder();
       renderGroupsRO();
       if (document.getElementById('tab-manual').classList.contains('active')) renderGroups();
     }
+
+    // Adaptive polling: 15s during live games, 90s otherwise
+    clearInterval(syncTimer);
+    if (!syncPaused) syncTimer = setInterval(syncNow, hasLive ? 15_000 : SYNC_MS);
   } catch (e) {
     setStatus('error', `&#10007; Sync failed: ${e.message}`);
   }
