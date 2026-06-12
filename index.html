@@ -78,7 +78,7 @@
     .tab-panel.active { display: block; }
 
     /* ── Draft Order Table ── */
-    .draft-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .draft-table { width: 100%; min-width: 500px; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 
     .draft-table th {
       background: var(--surface2);
@@ -165,17 +165,9 @@
     }
     @media (max-width: 768px) {
       .groups-grid-ro { grid-template-columns: repeat(2, 1fr); }
-      /* Hide less critical columns on tablet */
-      .draft-table th:nth-child(4),
-      .draft-table th:nth-child(5),
-      .draft-table td:nth-child(4),
-      .draft-table td:nth-child(5) { display: none; }
     }
     @media (max-width: 480px) {
       .groups-grid-ro { grid-template-columns: 1fr; }
-      /* Also hide Best Result on mobile — chips show status inline */
-      .draft-table th:nth-child(3),
-      .draft-table td:nth-child(3) { display: none; }
       .container { padding: 0.75rem; }
     }
     @media (max-width: 640px) {
