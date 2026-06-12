@@ -993,8 +993,7 @@ function statsFromMatches(appName, matches) {
   }
 
   if (round === -1) {
-    const grpDone = done.filter(m => m.stage === 'group-stage');
-    if (grpDone.length >= 3 && koDone.length === 0) round = 0;
+    if (active.some(m => m.stage === 'group-stage')) round = 0;
   }
 
   const groupDone = done.filter(m => m.stage === 'group-stage');
