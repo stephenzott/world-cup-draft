@@ -1029,7 +1029,7 @@ async function syncNow() {
   if (syncPaused) return;
   setStatus('syncing', '&#8635; Syncing…');
   try {
-    const endStr = espnDateStr(new Date(Date.now() + 86_400_000));
+    const endStr = '20260720';
     const dates = [];
     let cur = new Date('2026-06-11T12:00:00');
     while (espnDateStr(cur) <= endStr) { dates.push(espnDateStr(cur)); cur.setDate(cur.getDate() + 1); }
