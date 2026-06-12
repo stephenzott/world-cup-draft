@@ -368,6 +368,51 @@
     .sched-meta { font-size: 0.62rem; color: var(--muted); margin-top: 0.15rem; }
     .sched-meta-live { color: var(--green); font-weight: 700; }
     .sched-empty { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.85rem; }
+
+    /* ── Owner card modal ── */
+    .ft-name-btn {
+      background: none; border: none; font: inherit; font-weight: 700;
+      color: var(--text); cursor: pointer; padding: 0; text-align: left;
+    }
+    .ft-name-btn:hover { color: var(--border); }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 1000;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--surface); border-radius: 16px 16px 0 0;
+      width: 100%; max-width: 520px; max-height: 88vh;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    @media (min-width: 640px) {
+      .modal-backdrop { align-items: center; padding: 1.5rem; }
+      .modal-card { border-radius: 12px; }
+    }
+    .oc-handle {
+      width: 36px; height: 4px; background: #ddd; border-radius: 2px;
+      margin: 0.6rem auto 0;
+    }
+    @media (min-width: 640px) { .oc-handle { display: none; } }
+    .modal-close {
+      position: absolute; top: 0.85rem; right: 0.85rem;
+      background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
+      width: 44px; height: 44px; cursor: pointer; font-size: 0.9rem;
+      color: #fff; display: flex; align-items: center; justify-content: center;
+    }
+    .oc-header { position: relative; background: #111; padding: 1.75rem 1.5rem 1.25rem; text-align: center; }
+    .oc-rank-badge { font-size: 0.68rem; color: #888; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.3rem; }
+    .oc-owner-name { font-size: 1.6rem; font-weight: 800; color: var(--gold); letter-spacing: 0.03em; }
+    .oc-summary { display: flex; justify-content: center; gap: 1.25rem; font-size: 0.72rem; color: #888; margin-top: 0.6rem; }
+    .oc-summary strong { color: #fff; }
+    .oc-teams { padding: 1rem; display: flex; flex-direction: column; gap: 0.65rem; }
+    .oc-team-tile { background: var(--surface2); border-radius: 8px; padding: 0.75rem 0.9rem; border-left: 3px solid var(--border); }
+    .oc-team-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .oc-team-flag-name { font-weight: 700; font-size: 0.88rem; }
+    .oc-team-stats { font-size: 0.68rem; color: var(--muted); margin-top: 0.25rem; }
+    .oc-team-next  { font-size: 0.68rem; color: var(--border); margin-top: 0.2rem; font-weight: 600; }
+    .oc-eliminated { color: var(--red) !important; }
   </style>
 </head>
 <body>
@@ -694,7 +739,7 @@ function renderOrder() {
       <td class="${rankCls}">${i + 1}</td>
       <td>
         <div class="ft-name">
-          <span>${esc(ft.name)}</span>
+          <button class="ft-name-btn" onclick="showOwnerCard(${ft.id})">${esc(ft.name)}</button>
           ${tiedTag}
         </div>
         <div class="wc-chips">${chips}</div>
@@ -1119,6 +1164,86 @@ function renderSchedule() {
   box.innerHTML = html;
 }
 
+// ── Owner Card ─────────────────────────────────────────────────────────────
+
+function showOwnerCard(ftId) {
+  const ft = FANTASY_TEAMS.find(f => f.id === ftId);
+  if (!ft) return;
+
+  const order = sortOrder();
+  const rank  = order.findIndex(f => f.id === ftId) + 1;
+  const s     = order.find(f => f.id === ftId)?.score || {};
+  const [chipCls, chipLbl] = ROUND_CHIP[String(s.maxRound)] || ROUND_CHIP['-1'];
+  const gdStr = s.maxRound >= 0 ? (s.totalGD > 0 ? `+${s.totalGD}` : String(s.totalGD)) : '—';
+
+  let teamsHtml = '';
+  for (const team of ft.teams) {
+    const res  = state.results[team] || { round: -1, gf: 0, ga: 0, groupStats: null };
+    const [cc, cl] = ROUND_CHIP[String(res.round)] || ROUND_CHIP['-1'];
+    const flag = FLAGS[team] || '🏳';
+
+    let grpLetter = '';
+    for (const [g, gTeams] of Object.entries(GROUPS)) {
+      if (gTeams.includes(team)) { grpLetter = g; break; }
+    }
+
+    let statsHtml = '';
+    const gs = res.groupStats;
+    if (gs) {
+      const pts = gs.w * 3 + gs.d;
+      const gd  = gs.gf - gs.ga;
+      statsHtml = `<div class="oc-team-stats">Group ${grpLetter} &middot; ${gs.p} GP &middot; ${pts} pts &middot; ${gs.gf}–${gs.ga} (${gd >= 0 ? '+' : ''}${gd})</div>`;
+    } else {
+      statsHtml = `<div class="oc-team-stats">Group ${grpLetter}</div>`;
+    }
+
+    const upcoming = allNormalized
+      .filter(m => m.state !== 'post' && (m.home.name === team || m.away.name === team))
+      .sort((a, b) => a.utcDate.localeCompare(b.utcDate))[0];
+
+    let nextHtml = '';
+    if (upcoming) {
+      const opp      = upcoming.home.name === team ? upcoming.away.name : upcoming.home.name;
+      const oppFlag  = FLAGS[opp] || '';
+      const matchDay = schedFmtDate(upcoming.date);
+      const matchTime = new Date(upcoming.utcDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      nextHtml = `<div class="oc-team-next">Next: vs ${oppFlag} ${esc(opp)} &middot; ${matchDay}, ${matchTime}</div>`;
+    } else if (res.round >= 0) {
+      nextHtml = `<div class="oc-team-next oc-eliminated">Eliminated</div>`;
+    }
+
+    teamsHtml += `<div class="oc-team-tile">
+        <div class="oc-team-top">
+          <span class="oc-team-flag-name">${flag} ${esc(team)}</span>
+          <span class="chip ${cc}">${cl}</span>
+        </div>
+        ${statsHtml}${nextHtml}
+      </div>`;
+  }
+
+  const summary = s.maxRound >= 0
+    ? `<span>Best <strong>${chipLbl}</strong></span><span>Rounds <strong>${s.totalRounds}</strong></span><span>GD <strong>${gdStr}</strong></span>`
+    : `<span style="color:#666">No results yet</span>`;
+
+  document.getElementById('owner-card-content').innerHTML = `
+    <div class="oc-handle"></div>
+    <div class="oc-header">
+      <button class="modal-close" onclick="closeOwnerCard()">&#10005;</button>
+      <div class="oc-rank-badge">Draft Pick #${rank}</div>
+      <div class="oc-owner-name">${esc(ft.defaultName)}</div>
+      <div class="oc-summary">${summary}</div>
+    </div>
+    <div class="oc-teams">${teamsHtml}</div>`;
+
+  document.getElementById('owner-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeOwnerCard() {
+  document.getElementById('owner-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 function schedNav(dir) {
   const dates = schedMatchDates();
   const next  = dates.indexOf(scheduleDate) + dir;
@@ -1143,5 +1268,9 @@ if (new URLSearchParams(location.search).has('admin')) {
   document.getElementById('manual-tab-btn').style.display = '';
 }
 </script>
+
+<div id="owner-modal" class="modal-backdrop" onclick="closeOwnerCard()">
+  <div class="modal-card" id="owner-card-content" onclick="event.stopPropagation()"></div>
+</div>
 </body>
 </html>
