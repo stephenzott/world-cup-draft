@@ -1208,7 +1208,7 @@ function showOwnerCard(ftId) {
       const matchDay = schedFmtDate(upcoming.date);
       const matchTime = new Date(upcoming.utcDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       nextHtml = `<div class="oc-team-next">Next: vs ${oppFlag} ${esc(opp)} &middot; ${matchDay}, ${matchTime}</div>`;
-    } else if (res.round >= 0) {
+    } else if (res.round > 0) {
       nextHtml = `<div class="oc-team-next oc-eliminated">Eliminated</div>`;
     }
 
