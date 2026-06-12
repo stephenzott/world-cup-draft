@@ -106,12 +106,14 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 
 ## Live API Sync
 
-Pulls from `https://worldcupjson.net/matches` every 90 seconds.
+Pulls from the ESPN scoreboard API (`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard`) every 90 seconds. No API key required; CORS is open (`*`). Previously used `worldcupjson.net` but that site only has 2022 data.
 
-- Detects whether 2026 data is live (checks match datetimes ≥ 2026-06-11)
-- Shows sync status pill: Waiting / Syncing / Live (with timestamp) / Error
+- Fetches one request per date from June 11 through tomorrow in parallel (Promise.all), typically 2–40 requests depending on how far into the tournament we are
+- `normalizeEvent()` converts ESPN event shape to internal `{ stage, completed, home, away }` format
+- ESPN uses `season.slug` for stage (e.g. `group-stage`); KO stage slugs unconfirmed until July 4 — matched with permissive regex in `KO_STAGES`
+- Shows sync status pill: Syncing / Live (with timestamp) / Error
 - Manual "Sync Now" button + "Pause Auto-sync" toggle
-- Team name normalization handles API variants (e.g. "United States" → "USA", "South Korea" → "Korea Republic")
+- Team name normalization handles API variants (e.g. "United States" → "USA", "South Korea" → "Korea Republic", "Türkiye" → "Turkey")
 - KO stage logic correctly resolves 3rd/4th place: 3rd-place game winner = round 5, loser = round 4
 - Manual Entry data is preserved; API only writes when it has completed match data
 - On each sync, KO stage matches are also captured into `bracketMatches` and `renderBracketCols()` is called (bracket tab feature, on `knockout-bracket` branch)

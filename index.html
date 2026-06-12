@@ -798,7 +798,7 @@ function esc(s) {
 
 // ── API Sync ───────────────────────────────────────────────────────────────
 
-const API_BASE = 'https://worldcupjson.net';
+const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 const SYNC_MS   = 90_000;
 
 const API_NAME_MAP = {
@@ -813,80 +813,87 @@ const API_NAME_MAP = {
   'Congo DR':                         'DR Congo',
   'Democratic Republic of Congo':     'DR Congo',
   'Democratic Republic of the Congo': 'DR Congo',
+  'Türkiye':                          'Turkey',
 };
 
 function normName(n) { return API_NAME_MAP[n] || n; }
 
+// slug matching is permissive — KO stage slugs aren't confirmed until July 4
 const KO_STAGES = [
-  { name: 'Final',                win: 7,    loss: 6 },
-  { name: 'Third place play-off', win: 5,    loss: 4 },
-  { name: 'Semi-final',           win: null, loss: 4 }, // temp 4th until 3rd-place match resolves
-  { name: 'Semi-finals',          win: null, loss: 4 },
-  { name: 'Quarter-final',        win: null, loss: 3 },
-  { name: 'Quarter-finals',       win: null, loss: 3 },
-  { name: 'Round of 16',          win: null, loss: 2 },
-  { name: 'Round of 32',          win: null, loss: 1 },
+  { test: s => /final/i.test(s) && !/semi|third/i.test(s), win: 7,    loss: 6 },
+  { test: s => /third|3rd/i.test(s),                        win: 5,    loss: 4 },
+  { test: s => /semi/i.test(s),                             win: null, loss: 4 },
+  { test: s => /quarter/i.test(s),                          win: null, loss: 3 },
+  { test: s => /round.of.16/i.test(s),                      win: null, loss: 2 },
+  { test: s => /round.of.32/i.test(s),                      win: null, loss: 1 },
 ];
 
-// Withdrawn/forfeit: 3-0 awarded to the non-withdrawing side. The API should
-// reflect this in goals, so no special handling needed beyond correct goal entry.
-function didWin(match, appName) {
-  const isHome = normName(match.home_team.name) === appName;
-  const hg = match.home_team_goals || 0;
-  const ag = match.away_team_goals || 0;
-  if (hg !== ag) return isHome ? hg > ag : ag > hg;
-  const hp = match.home_team?.penalties ?? match.home_team_penalties ?? 0;
-  const ap = match.away_team?.penalties ?? match.away_team_penalties ?? 0;
-  if (hp !== ap) return isHome ? hp > ap : ap > hp;
-  return null;
+function normalizeEvent(event) {
+  const comp = event.competitions?.[0];
+  if (!comp) return null;
+  const slug = event.season?.slug || '';
+  const state = comp.status?.type?.state || '';
+  const competitors = comp.competitors || [];
+  const home = competitors.find(c => c.homeAway === 'home');
+  const away = competitors.find(c => c.homeAway === 'away');
+  if (!home || !away) return null;
+  return {
+    stage:     slug,
+    completed: state === 'post',
+    home: { name: normName(home.team.displayName), goals: parseInt(home.score) || 0, winner: !!home.winner },
+    away: { name: normName(away.team.displayName), goals: parseInt(away.score) || 0, winner: !!away.winner },
+  };
 }
 
 function statsFromMatches(appName, matches) {
-  const mine = matches.filter(m =>
-    normName(m.home_team.name) === appName || normName(m.away_team.name) === appName
-  );
-  const done = mine.filter(m => m.status === 'completed');
+  const mine = matches.filter(m => m.home.name === appName || m.away.name === appName);
+  const done = mine.filter(m => m.completed);
   if (!done.length) return null;
 
   let gf = 0, ga = 0;
   for (const m of done) {
-    const home = normName(m.home_team.name) === appName;
-    gf += home ? (m.home_team_goals || 0) : (m.away_team_goals || 0);
-    ga += home ? (m.away_team_goals || 0) : (m.home_team_goals || 0);
+    const isHome = m.home.name === appName;
+    gf += isHome ? m.home.goals : m.away.goals;
+    ga += isHome ? m.away.goals : m.home.goals;
   }
 
   let round = -1;
+  const koDone = done.filter(m => m.stage !== 'group-stage');
   for (const stage of KO_STAGES) {
-    const sm = done.find(m => m.stage_name === stage.name);
+    const sm = koDone.find(m => stage.test(m.stage));
     if (!sm) continue;
-    const won = didWin(sm, appName);
-    if (won === false || won === null) { round = stage.loss; break; }
-    if (won === true && stage.win !== null) { round = stage.win; break; }
+    const isHome = sm.home.name === appName;
+    const won = isHome ? sm.home.winner : sm.away.winner;
+    if (!won && stage.loss !== null) { round = stage.loss; break; }
+    if (won && stage.win !== null)   { round = stage.win; break; }
   }
 
   if (round === -1) {
-    const grpDone = done.filter(m => m.stage_name === 'First stage');
-    if (grpDone.length >= 3) round = 0;
+    const grpDone = done.filter(m => m.stage === 'group-stage');
+    if (grpDone.length >= 3 && koDone.length === 0) round = 0;
   }
 
-  const groupDone = done.filter(m => m.stage_name === 'First stage');
+  const groupDone = done.filter(m => m.stage === 'group-stage');
   let groupStats = null;
   if (groupDone.length) {
     let w = 0, d = 0, l = 0, ggf = 0, gga = 0;
     for (const m of groupDone) {
-      const home = normName(m.home_team.name) === appName;
-      const hg = m.home_team_goals || 0;
-      const ag = m.away_team_goals || 0;
-      ggf += home ? hg : ag;
-      gga += home ? ag : hg;
-      if (hg > ag) { if (home) w++; else l++; }
-      else if (hg < ag) { if (home) l++; else w++; }
+      const isHome = m.home.name === appName;
+      const myG  = isHome ? m.home.goals : m.away.goals;
+      const oppG = isHome ? m.away.goals : m.home.goals;
+      ggf += myG; gga += oppG;
+      if (myG > oppG) w++;
+      else if (myG < oppG) l++;
       else d++;
     }
     groupStats = { p: groupDone.length, w, d, l, gf: ggf, ga: gga };
   }
 
   return { round, gf, ga, groupStats };
+}
+
+function espnDateStr(d) {
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
 }
 
 let syncPaused = false;
@@ -896,22 +903,35 @@ async function syncNow() {
   if (syncPaused) return;
   setStatus('syncing', '&#8635; Syncing…');
   try {
-    const res = await fetch(`${API_BASE}/matches`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const matches = await res.json();
+    const start = new Date('2026-06-11');
+    const end   = new Date(); end.setDate(end.getDate() + 1);
+    const dates = [];
+    let cur = new Date(start);
+    while (cur <= end) { dates.push(espnDateStr(cur)); cur.setDate(cur.getDate() + 1); }
 
-    const is2026 = Array.isArray(matches) && matches.some(
-      m => m.datetime && new Date(m.datetime) >= new Date('2026-06-11')
+    const responses = await Promise.all(
+      dates.map(d =>
+        fetch(`${ESPN_API}?dates=${d}`)
+          .then(r => r.ok ? r.json() : { events: [] })
+          .catch(() => ({ events: [] }))
+      )
     );
-    if (!is2026) {
-      setStatus('waiting', '&#9679; Waiting for 2026 tournament data');
-      return;
-    }
+
+    const normalized = responses.flatMap(r => r.events || []).map(normalizeEvent).filter(Boolean);
 
     let changed = false;
     for (const team of Object.values(GROUPS).flat()) {
-      const s = statsFromMatches(team, matches);
-      if (s) { state.results[team] = { round: s.round, gf: s.gf, ga: s.ga, groupStats: s.groupStats }; changed = true; }
+      const s = statsFromMatches(team, normalized);
+      if (s) {
+        const prev = state.results[team] || {};
+        state.results[team] = {
+          round:      s.round !== -1 ? s.round : (prev.round ?? -1),
+          gf:         s.gf,
+          ga:         s.ga,
+          groupStats: s.groupStats,
+        };
+        changed = true;
+      }
     }
 
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
