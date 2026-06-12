@@ -917,7 +917,8 @@ function esc(s) {
 
 // ── API Sync ───────────────────────────────────────────────────────────────
 
-const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const ESPN_API   = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const ESPN_SCHED = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/schedule';
 const SYNC_MS   = 90_000;
 
 const API_NAME_MAP = {
@@ -1035,12 +1036,14 @@ async function syncNow() {
     let cur = new Date(start);
     while (cur <= end) { dates.push(espnDateStr(cur)); cur.setDate(cur.getDate() + 1); }
 
+    const todayStr = espnDateStr(new Date());
     const responses = await Promise.all(
-      dates.map(d =>
-        fetch(`${ESPN_API}?dates=${d}`)
+      dates.map(d => {
+        const url = d > todayStr ? ESPN_SCHED : ESPN_API;
+        return fetch(`${url}?dates=${d}`)
           .then(r => r.ok ? r.json() : { events: [] })
-          .catch(() => ({ events: [] }))
-      )
+          .catch(() => ({ events: [] }));
+      })
     );
 
     allNormalized = responses.flatMap((r, i) => {
