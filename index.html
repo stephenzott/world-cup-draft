@@ -324,6 +324,50 @@
     }
     .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
     .stage-pill { background: #e8ecff; color: var(--border); border: 1px solid var(--border); font-weight: 700; }
+
+    /* ── Schedule & Results ── */
+    .sched-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .sched-nav-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--border);
+      border-radius: 4px;
+      padding: 0.25rem 0.8rem;
+      font-size: 1rem;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .sched-nav-btn:disabled { opacity: 0.25; cursor: default; }
+    .sched-date-label { flex: 1; text-align: center; font-weight: 700; font-size: 0.9rem; }
+    .sched-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .sched-match {
+      display: grid;
+      grid-template-columns: 1fr 88px 1fr;
+      gap: 0.5rem;
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid #d4d9ff;
+      align-items: center;
+    }
+    .sched-match:last-child { border-bottom: none; }
+    .sched-match-live { border-left: 3px solid var(--green); }
+    .sched-home { text-align: right; }
+    .sched-away { text-align: left; }
+    .sched-team-name { font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sched-winner { color: var(--border); }
+    .sched-loser  { color: var(--muted); font-weight: 400; }
+    .sched-owner-sm { font-size: 0.62rem; color: var(--muted); margin-top: 0.1rem; }
+    .sched-center { text-align: center; }
+    .sched-score-big { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.04em; }
+    .sched-vs-txt { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .sched-meta { font-size: 0.62rem; color: var(--muted); margin-top: 0.15rem; }
+    .sched-meta-live { color: var(--green); font-weight: 700; }
+    .sched-empty { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -389,6 +433,18 @@
       </table>
       </table></div>
       <p class="footer-note">Sort: Best Result &rarr; Total Rounds &rarr; Goal Difference &rarr; Coin Flip</p>
+    </section>
+
+    <section>
+      <h2>Schedule &amp; Results</h2>
+      <div class="sched-nav">
+        <button class="sched-nav-btn" id="sched-prev" onclick="schedNav(-1)">&#8592;</button>
+        <span class="sched-date-label" id="sched-date-label">—</span>
+        <button class="sched-nav-btn" id="sched-next" onclick="schedNav(1)">&#8594;</button>
+      </div>
+      <div class="sched-card" id="sched-matches">
+        <p class="sched-empty">Waiting for data…</p>
+      </div>
     </section>
 
     <section>
@@ -840,7 +896,10 @@ function normalizeEvent(event) {
   const away = competitors.find(c => c.homeAway === 'away');
   if (!home || !away) return null;
   return {
+    date:      event.date || '',
     stage:     slug,
+    state,
+    clock:     comp.status?.displayClock || '',
     completed: state === 'post',
     home: { name: normName(home.team.displayName), goals: parseInt(home.score) || 0, winner: !!home.winner },
     away: { name: normName(away.team.displayName), goals: parseInt(away.score) || 0, winner: !!away.winner },
@@ -898,8 +957,10 @@ function espnDateStr(d) {
   return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
 }
 
-let syncPaused = false;
-let syncTimer  = null;
+let syncPaused    = false;
+let syncTimer     = null;
+let allNormalized = [];
+let scheduleDate  = new Date().toISOString().slice(0, 10);
 
 async function syncNow() {
   if (syncPaused) return;
@@ -919,7 +980,9 @@ async function syncNow() {
       )
     );
 
-    const normalized = responses.flatMap(r => r.events || []).map(normalizeEvent).filter(Boolean);
+    allNormalized = responses.flatMap(r => r.events || []).map(normalizeEvent).filter(Boolean);
+    const normalized = allNormalized;
+    renderSchedule();
 
     let changed = false;
     for (const team of Object.values(GROUPS).flat()) {
@@ -959,6 +1022,103 @@ function togglePause() {
   syncPaused = !syncPaused;
   document.getElementById('pause-btn').textContent = syncPaused ? 'Resume Auto-sync' : 'Pause Auto-sync';
   if (!syncPaused) syncNow();
+}
+
+// ── Schedule ───────────────────────────────────────────────────────────────
+
+function schedMatchDates() {
+  return [...new Set(allNormalized.map(m => m.date.slice(0, 10)))].sort();
+}
+
+function schedFmtDate(ds) {
+  return new Date(ds + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function renderSchedule() {
+  const dates  = schedMatchDates();
+  const prevBtn = document.getElementById('sched-prev');
+  const nextBtn = document.getElementById('sched-next');
+  const label   = document.getElementById('sched-date-label');
+  const box     = document.getElementById('sched-matches');
+
+  if (!dates.length) {
+    label.textContent = '—';
+    prevBtn.disabled = nextBtn.disabled = true;
+    box.innerHTML = '<p class="sched-empty">Waiting for data…</p>';
+    return;
+  }
+
+  if (!dates.includes(scheduleDate)) {
+    const today = new Date().toISOString().slice(0, 10);
+    const past  = dates.filter(d => d <= today);
+    scheduleDate = past.length ? past[past.length - 1] : dates[0];
+  }
+
+  const idx = dates.indexOf(scheduleDate);
+  prevBtn.disabled = idx <= 0;
+  nextBtn.disabled = idx >= dates.length - 1;
+  label.textContent = schedFmtDate(scheduleDate);
+
+  const day = allNormalized
+    .filter(m => m.date.slice(0, 10) === scheduleDate)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!day.length) {
+    box.innerHTML = '<p class="sched-empty">No matches on this date.</p>';
+    return;
+  }
+
+  let html = '';
+  for (const m of day) {
+    const homeOwner = FANTASY_TEAMS.find(ft => ft.teams.includes(m.home.name))?.defaultName || '?';
+    const awayOwner = FANTASY_TEAMS.find(ft => ft.teams.includes(m.away.name))?.defaultName || '?';
+    const homeFlag  = FLAGS[m.home.name] || '';
+    const awayFlag  = FLAGS[m.away.name] || '';
+
+    let stageLabel = '';
+    for (const [g, teams] of Object.entries(GROUPS)) {
+      if (teams.includes(m.home.name)) { stageLabel = `Group ${g}`; break; }
+    }
+    if (!stageLabel) stageLabel = m.stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    const localTime = new Date(m.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    let scoreHtml, metaHtml;
+    if (m.completed) {
+      scoreHtml = `<div class="sched-score-big">${m.home.goals}&thinsp;&ndash;&thinsp;${m.away.goals}</div>`;
+      metaHtml  = `<div class="sched-meta">FT &middot; ${stageLabel}</div>`;
+    } else if (m.state === 'in') {
+      scoreHtml = `<div class="sched-score-big">${m.home.goals}&thinsp;&ndash;&thinsp;${m.away.goals}</div>`;
+      metaHtml  = `<div class="sched-meta sched-meta-live">&#9679; ${esc(m.clock)} &middot; ${stageLabel}</div>`;
+    } else {
+      scoreHtml = `<div class="sched-vs-txt">${localTime}</div>`;
+      metaHtml  = `<div class="sched-meta">${stageLabel}</div>`;
+    }
+
+    const hWon = m.completed && m.home.winner;
+    const aWon = m.completed && m.away.winner;
+    const hCls = m.completed ? (hWon ? ' sched-winner' : ' sched-loser') : '';
+    const aCls = m.completed ? (aWon ? ' sched-winner' : ' sched-loser') : '';
+
+    html += `<div class="sched-match${m.state === 'in' ? ' sched-match-live' : ''}">
+        <div class="sched-home">
+          <div class="sched-team-name${hCls}">${homeFlag} ${esc(m.home.name)}</div>
+          <div class="sched-owner-sm">${esc(homeOwner)}</div>
+        </div>
+        <div class="sched-center">${scoreHtml}${metaHtml}</div>
+        <div class="sched-away">
+          <div class="sched-team-name${aCls}">${awayFlag} ${esc(m.away.name)}</div>
+          <div class="sched-owner-sm">${esc(awayOwner)}</div>
+        </div>
+      </div>`;
+  }
+  box.innerHTML = html;
+}
+
+function schedNav(dir) {
+  const dates = schedMatchDates();
+  const next  = dates.indexOf(scheduleDate) + dir;
+  if (next >= 0 && next < dates.length) { scheduleDate = dates[next]; renderSchedule(); }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
