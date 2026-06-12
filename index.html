@@ -886,7 +886,7 @@ const KO_STAGES = [
   { test: s => /round.of.32/i.test(s),                      win: null, loss: 1 },
 ];
 
-function normalizeEvent(event) {
+function normalizeEvent(event, queryDate) {
   const comp = event.competitions?.[0];
   if (!comp) return null;
   const slug = event.season?.slug || '';
@@ -896,7 +896,8 @@ function normalizeEvent(event) {
   const away = competitors.find(c => c.homeAway === 'away');
   if (!home || !away) return null;
   return {
-    date:      event.date || '',
+    date:      queryDate || event.date.slice(0, 10),
+    utcDate:   event.date || '',
     stage:     slug,
     state,
     clock:     comp.status?.displayClock || '',
@@ -980,7 +981,10 @@ async function syncNow() {
       )
     );
 
-    allNormalized = responses.flatMap(r => r.events || []).map(normalizeEvent).filter(Boolean);
+    allNormalized = responses.flatMap((r, i) => {
+      const qDate = dates[i].replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+      return (r.events || []).map(ev => normalizeEvent(ev, qDate));
+    }).filter(Boolean);
     const normalized = allNormalized;
     renderSchedule();
 
@@ -1081,7 +1085,7 @@ function renderSchedule() {
     }
     if (!stageLabel) stageLabel = m.stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-    const localTime = new Date(m.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const localTime = new Date(m.utcDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
     let scoreHtml, metaHtml;
     if (m.completed) {
