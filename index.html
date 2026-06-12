@@ -1051,6 +1051,12 @@ async function syncNow() {
     const normalized = allNormalized;
     renderSchedule();
 
+    // Snapshot state before updates so baseline for rank-movement arrows is pre-live
+    const prevResults = {};
+    for (const team of Object.values(GROUPS).flat()) {
+      prevResults[team] = { ...(state.results[team] || { round: -1, gf: 0, ga: 0 }) };
+    }
+
     let changed = false;
     for (const team of Object.values(GROUPS).flat()) {
       const s = statsFromMatches(team, normalized);
@@ -1074,10 +1080,10 @@ async function syncNow() {
       const baseResults = {};
       for (const team of Object.values(GROUPS).flat()) {
         const s = statsFromMatches(team, completedOnly);
-        const prev = state.results[team] || {};
+        const savedPrev = prevResults[team];
         baseResults[team] = s
-          ? { round: s.round !== -1 ? s.round : (prev.round ?? -1), gf: s.gf, ga: s.ga }
-          : { ...prev };
+          ? { round: s.round !== -1 ? s.round : (savedPrev.round ?? -1), gf: s.gf, ga: s.ga }
+          : { ...savedPrev }; // use pre-sync snapshot, not live-updated state
       }
       const baseOrder = sortOrder(baseResults);
       const liveOrder = sortOrder();
