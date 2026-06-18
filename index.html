@@ -431,8 +431,8 @@
       letter-spacing: 0.05em; text-transform: uppercase;
     }
     .bracket-wrap { overflow-x: auto; padding-bottom: 0.75rem; }
-    .bracket-cols { display: flex; gap: 0.75rem; align-items: flex-start; min-width: max-content; }
-    .bracket-col { width: 200px; flex-shrink: 0; }
+    .bracket-cols { display: flex; gap: 0.75rem; align-items: flex-start; min-width: max-content; --bslot: 84px; }
+    .bracket-col { width: 200px; flex-shrink: 0; overflow: visible; }
     .bracket-col-header {
       background: var(--border); color: #fff; font-size: 0.72rem; font-weight: 800;
       text-transform: uppercase; letter-spacing: 0.07em; padding: 0.38rem 0.6rem;
@@ -456,6 +456,26 @@
       text-align: center; font-size: 0.65rem; color: var(--muted);
       text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
     }
+    /* ── Bracket slot/pair/connector ── */
+    .bracket-col-body { padding-top: 0.35rem; overflow: visible; }
+    .bpair { position: relative; }
+    .bs    { display: flex; flex-direction: column; justify-content: center; }
+    .bpair::after {
+      content: ''; position: absolute; box-sizing: border-box;
+      right: -0.75rem; width: 0.75rem; pointer-events: none;
+      border-right: 2px solid #c0c8ff;
+      border-top:   2px solid #c0c8ff;
+      border-bottom: 2px solid #c0c8ff;
+    }
+    .col-r32 .bs           { height: var(--bslot); }
+    .col-r32 .bpair::after { top: calc(var(--bslot) * 0.5); height: var(--bslot); }
+    .col-r16 .bs           { height: calc(var(--bslot) * 2); }
+    .col-r16 .bpair::after { top: var(--bslot); height: calc(var(--bslot) * 2); }
+    .col-qf  .bs           { height: calc(var(--bslot) * 4); }
+    .col-qf  .bpair::after { top: calc(var(--bslot) * 2); height: calc(var(--bslot) * 4); }
+    .col-sf  .bs           { height: calc(var(--bslot) * 8); }
+    .col-sf  .bpair::after { top: calc(var(--bslot) * 4); height: calc(var(--bslot) * 8); }
+    .col-final .bs         { height: calc(var(--bslot) * 16); }
     /* ── Teams Still Alive ── */
     .alive-grid {
       display: grid;
@@ -1461,36 +1481,71 @@ function renderProjBracketCols() {
   if (!container) return;
   container.innerHTML = '';
 
-  let r32;
-  try { r32 = getProjectedR32(); }
+  let r32all;
+  try { r32all = getProjectedR32(); }
   catch(e) {
     container.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:1rem 0">Bracket will populate once group stage data is available.</p>';
     return;
   }
 
-  const STAGES = [
-    { label:'R32',   count:16 },
-    { label:'R16',   count:8  },
-    { label:'QF',    count:4  },
-    { label:'SF',    count:2  },
-    { label:'Final', count:1  },
+  // Pairs of R32_MATCHES indices that feed the same R16 match, in bracket order
+  const R32_PAIRS = [
+    [1, 4],   // M74, M77 → R16 M89
+    [0, 2],   // M73, M75 → R16 M90
+    [10, 11], // M83, M84 → R16 M93
+    [8, 9],   // M81, M82 → R16 M94
+    [3, 5],   // M76, M78 → R16 M91
+    [6, 7],   // M79, M80 → R16 M92
+    [13, 15], // M86, M88 → R16 M95
+    [12, 14], // M85, M87 → R16 M96
   ];
 
-  STAGES.forEach(stage => {
-    const col = document.createElement('div');
-    col.className = 'bracket-col';
-    let html = '';
-    if (stage.label === 'R32') {
-      html = r32.map(m => buildProjMatchCard(m.homeTeam, m.awayTeam)).join('');
-    } else {
-      for (let i = 0; i < stage.count; i++) html += `<div class="match-placeholder">TBD</div>`;
-    }
-    if (stage.label === 'Final') {
-      html += `<div class="third-place-sep">3rd Place</div><div class="match-placeholder">TBD</div>`;
-    }
-    col.innerHTML = `<div class="bracket-col-header">${stage.label}</div><div class="bracket-matches">${html}</div>`;
-    container.appendChild(col);
-  });
+  const tbd  = () => buildProjMatchCard(null, null);
+  const slot = card  => `<div class="bs">${card}</div>`;
+  const pair = cards => `<div class="bpair">${cards.map(slot).join('')}</div>`;
+
+  // R32
+  const r32Col = document.createElement('div');
+  r32Col.className = 'bracket-col col-r32';
+  r32Col.innerHTML = `<div class="bracket-col-header">R32</div><div class="bracket-col-body">${
+    R32_PAIRS.map(([a, b]) => pair([
+      buildProjMatchCard(r32all[a].homeTeam, r32all[a].awayTeam),
+      buildProjMatchCard(r32all[b].homeTeam, r32all[b].awayTeam),
+    ])).join('')
+  }</div>`;
+  container.appendChild(r32Col);
+
+  // R16 (4 pairs)
+  const r16Col = document.createElement('div');
+  r16Col.className = 'bracket-col col-r16';
+  r16Col.innerHTML = `<div class="bracket-col-header">R16</div><div class="bracket-col-body">${
+    [0,1,2,3].map(() => pair([tbd(), tbd()])).join('')
+  }</div>`;
+  container.appendChild(r16Col);
+
+  // QF (2 pairs)
+  const qfCol = document.createElement('div');
+  qfCol.className = 'bracket-col col-qf';
+  qfCol.innerHTML = `<div class="bracket-col-header">QF</div><div class="bracket-col-body">${
+    [0,1].map(() => pair([tbd(), tbd()])).join('')
+  }</div>`;
+  container.appendChild(qfCol);
+
+  // SF (1 pair)
+  const sfCol = document.createElement('div');
+  sfCol.className = 'bracket-col col-sf';
+  sfCol.innerHTML = `<div class="bracket-col-header">SF</div><div class="bracket-col-body">${
+    pair([tbd(), tbd()])
+  }</div>`;
+  container.appendChild(sfCol);
+
+  // Final (1 card) + 3rd place
+  const finalCol = document.createElement('div');
+  finalCol.className = 'bracket-col col-final';
+  finalCol.innerHTML = `<div class="bracket-col-header">Final</div><div class="bracket-col-body">${
+    slot(tbd())
+  }<div class="third-place-sep">3rd Place</div>${tbd()}</div>`;
+  container.appendChild(finalCol);
 }
 
 function renderProjectedBracket() {
