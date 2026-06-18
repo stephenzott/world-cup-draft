@@ -419,6 +419,43 @@
     .oc-team-stats { font-size: 0.68rem; color: var(--muted); margin-top: 0.25rem; }
     .oc-team-next  { font-size: 0.68rem; color: var(--border); margin-top: 0.2rem; font-weight: 600; }
     .oc-eliminated { color: var(--red) !important; }
+    .sync-live  { background: #e8f5ee; color: var(--green); border: 1px solid var(--green); }
+    .draft-table tr.third-adv td { background: rgba(236,255,67,0.13); }
+    .draft-table tr.third-cutoff td { border-top: 2px solid var(--border); }
+
+    /* ── Projected Tab ── */
+    .proj-banner {
+      background: #fff3e0; border: 2px solid #c05000; border-radius: 8px;
+      padding: 0.75rem 1rem; text-align: center; font-weight: 700;
+      font-size: 0.82rem; color: #c05000; margin-bottom: 1.5rem;
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .bracket-wrap { overflow-x: auto; padding-bottom: 0.75rem; }
+    .bracket-cols { display: flex; gap: 0.75rem; align-items: flex-start; min-width: max-content; }
+    .bracket-col { width: 200px; flex-shrink: 0; }
+    .bracket-col-header {
+      background: var(--border); color: #fff; font-size: 0.72rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.07em; padding: 0.38rem 0.6rem;
+      border-radius: 5px 5px 0 0; text-align: center;
+    }
+    .bracket-matches { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.35rem; }
+    .match-card { background: var(--surface); border: 1px solid #d4d9ff; border-radius: 5px; overflow: hidden; }
+    .match-team-row { display: flex; align-items: center; gap: 0.28rem; padding: 0.32rem 0.45rem; }
+    .match-team-row + .match-team-row { border-top: 1px solid #f0f2ff; }
+    .match-team-row.mt-tbd { background: var(--surface2); }
+    .match-flag { font-size: 0.95rem; flex-shrink: 0; }
+    .match-info { flex: 1; min-width: 0; }
+    .match-name  { font-size: 0.73rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .match-owner { font-size: 0.58rem; color: var(--muted); white-space: nowrap; display: block; }
+    .match-placeholder {
+      background: var(--surface2); border: 1px dashed #ccc; border-radius: 5px;
+      padding: 0.9rem 0.5rem; text-align: center; color: var(--muted); font-size: 0.7rem;
+    }
+    .third-place-sep {
+      margin-top: 0.75rem; padding-top: 0.35rem; border-top: 1px dashed #ccc;
+      text-align: center; font-size: 0.65rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -463,8 +500,9 @@
 
 <div class="container">
 
-  <nav class="tabs-nav" id="tabs-nav" style="display:none">
+  <nav class="tabs-nav" id="tabs-nav">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
+    <button class="tab-btn" onclick="showTab('projected')">Projected</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
   </nav>
 
@@ -517,6 +555,25 @@
     <section>
       <h2>World Cup Groups</h2>
       <div class="groups-grid-ro" id="groups-ro"></div>
+    </section>
+
+    <section>
+      <h2>Best 3rd Place Teams</h2>
+      <div id="third-place-table"></div>
+    </section>
+
+  </div>
+
+  <!-- ── Tab: Projected ── -->
+  <div class="tab-panel" id="tab-projected">
+
+    <div class="proj-banner" id="proj-banner">BASED ON CURRENT STANDINGS &mdash; NOT FINAL</div>
+
+    <section>
+      <h2>Projected Knockout Bracket</h2>
+      <div class="bracket-wrap">
+        <div class="bracket-cols" id="proj-bracket-cols"></div>
+      </div>
     </section>
 
   </div>
@@ -652,6 +709,208 @@ const ROUND_CHIP = {
   '7':  ['chip-champ', '\u{1F3C6}'],
 };
 
+const FIFA_RANKINGS = {
+  'Argentina':1,'France':2,'Spain':3,'England':4,'Brazil':5,'Morocco':6,
+  'Portugal':7,'Netherlands':8,'Germany':9,'Belgium':10,'Colombia':11,
+  'Mexico':13,'Croatia':14,'USA':15,'Senegal':16,'Japan':17,'Uruguay':18,
+  'Switzerland':19,'Austria':21,'Korea Republic':22,'Australia':23,
+  'Iran':24,'Turkey':26,'Norway':27,'Ecuador':28,'Egypt':29,
+  "Côte d'Ivoire":30,'Algeria':31,'Canada':32,'Sweden':34,'Scotland':37,
+  'Panama':40,'Paraguay':42,'DR Congo':43,'Czechia':44,'Qatar':49,
+  'Tunisia':55,'Uzbekistan':56,'Saudi Arabia':59,'Iraq':60,'South Africa':61,
+  'Bosnia and Herzegovina':63,'Cape Verde':64,'Ghana':65,'Jordan':68,
+  'New Zealand':82,'Curaçao':83,'Haiti':85,
+};
+
+// 495 third-place slot combos: key = sorted 8 advancing groups,
+// value = 8-char slot assignment in order [M74,M77,M79,M80,M81,M82,M85,M87]
+const THIRD_COMBOS = {
+  'ABCDEFGH':'CFHEBAGD','ABCDEFGI':'DFCIBAGE','ABCDEFGJ':'DFCJBAGE',
+  'ABCDEFGK':'DFCKBAGE','ABCDEFGL':'DFCEBAGL','ABCDEFHI':'CFHIBAED',
+  'ABCDEFHJ':'CFHEBAJD','ABCDEFHK':'CFHKBAED','ABCDEFHL':'CDHEBAFL',
+  'ABCDEFIJ':'DFCIBAJE','ABCDEFIK':'DFCKBAEI','ABCDEFIL':'DFCIBAEL',
+  'ABCDEFJK':'DFCKBAJE','ABCDEFJL':'DFCEBAJL','ABCDEFKL':'DFCKBAEL',
+  'ABCDEGHI':'CDHIBAGE','ABCDEGHJ':'CDHJBAGE','ABCDEGHK':'CDHKBAGE',
+  'ABCDEGHL':'CDHEBAGL','ABCDEGIJ':'CDEJBAGI','ABCDEGIK':'CDEKBAGI',
+  'ABCDEGIL':'CDEIBAGL','ABCDEGJK':'CDEKBAGJ','ABCDEGJL':'CDEJBAGL',
+  'ABCDEGKL':'CDEKBAGL','ABCDEHIJ':'CDHIBAJE','ABCDEHIK':'CDHKBAEI',
+  'ABCDEHIL':'CDHIBAEL','ABCDEHJK':'CDHKBAJE','ABCDEHJL':'CDHEBAJL',
+  'ABCDEHKL':'CDHKBAEL','ABCDEIJK':'CDEKBAJI','ABCDEIJL':'CDEIBAJL',
+  'ABCDEIKL':'CDEKBAIL','ABCDEJKL':'CDEKBAJL','ABCDFGHI':'CFHIBAGD',
+  'ABCDFGHJ':'CFHJBAGD','ABCDFGHK':'CFHKBAGD','ABCDFGHL':'DFCHBAGL',
+  'ABCDFGIJ':'DFCJBAGI','ABCDFGIK':'DFCKBAGI','ABCDFGIL':'DFCIBAGL',
+  'ABCDFGJK':'DFCKBAGJ','ABCDFGJL':'DFCJBAGL','ABCDFGKL':'DFCKBAGL',
+  'ABCDFHIJ':'CFHIBAJD','ABCDFHIK':'CDHKBAFI','ABCDFHIL':'CDHIBAFL',
+  'ABCDFHJK':'CFHKBAJD','ABCDFHJL':'DFCHBAJL','ABCDFHKL':'CDHKBAFL',
+  'ABCDFIJK':'DFCKBAJI','ABCDFIJL':'DFCIBAJL','ABCDFIKL':'DFCKBAIL',
+  'ABCDFJKL':'DFCKBAJL','ABCDGHIJ':'CDHJBAGI','ABCDGHIK':'CDHKBAGI',
+  'ABCDGHIL':'CDHIBAGL','ABCDGHJK':'CDHKBAGJ','ABCDGHJL':'CDHJBAGL',
+  'ABCDGHKL':'CDHKBAGL','ABCDGIJK':'DGCKBAJI','ABCDGIJL':'DGCIBAJL',
+  'ABCDGIKL':'CDIKBAGL','ABCDGJKL':'DGCKBAJL','ABCDHIJK':'CDHKBAJI',
+  'ABCDHIJL':'CDHIBAJL','ABCDHIKL':'CDHKBAIL','ABCDHJKL':'CDHKBAJL',
+  'ABCDIJKL':'CDIKBAJL','ABCEFGHI':'CFHIBAGE','ABCEFGHJ':'CFHJBAGE',
+  'ABCEFGHK':'CFHKBAGE','ABCEFGHL':'CFHEBAGL','ABCEFGIJ':'CFEJBAGI',
+  'ABCEFGIK':'CFEKBAGI','ABCEFGIL':'CFEIBAGL','ABCEFGJK':'CFEKBAGJ',
+  'ABCEFGJL':'CFEJBAGL','ABCEFGKL':'CFEKBAGL','ABCEFHIJ':'CFHIBAJE',
+  'ABCEFHIK':'CFHKBAEI','ABCEFHIL':'CFHIBAEL','ABCEFHJK':'CFHKBAJE',
+  'ABCEFHJL':'CFHEBAJL','ABCEFHKL':'CFHKBAEL','ABCEFIJK':'CFEKBAJI',
+  'ABCEFIJL':'CFEIBAJL','ABCEFIKL':'CFEKBAIL','ABCEFJKL':'CFEKBAJL',
+  'ABCEGHIJ':'CGHIBAJE','ABCEGHIK':'CHEKBAGI','ABCEGHIL':'CHEIBAGL',
+  'ABCEGHJK':'CGHKBAJE','ABCEGHJL':'CGHEBAJL','ABCEGHKL':'CHEKBAGL',
+  'ABCEGIJK':'CGEKBAJI','ABCEGIJL':'CGEIBAJL','ABCEGIKL':'ACEKBIGL',
+  'ABCEGJKL':'CGEKBAJL','ABCEHIJK':'CHEKBAJI','ABCEHIJL':'CHEIBAJL',
+  'ABCEHIKL':'CHEKBAIL','ABCEHJKL':'CHEKBAJL','ABCEIJKL':'ACEKBIJL',
+  'ABCFGHIJ':'CFHJBAGI','ABCFGHIK':'CFHKBAGI','ABCFGHIL':'CFHIBAGL',
+  'ABCFGHJK':'CFHKBAGJ','ABCFGHJL':'CFHJBAGL','ABCFGHKL':'CFHKBAGL',
+  'ABCFGIJK':'FGCKBAJI','ABCFGIJL':'FGCIBAJL','ABCFGIKL':'CFIKBAGL',
+  'ABCFGJKL':'FGCKBAJL','ABCFHIJK':'CFHKBAJI','ABCFHIJL':'CFHIBAJL',
+  'ABCFHIKL':'CFHKBAIL','ABCFHJKL':'CFHKBAJL','ABCFIJKL':'CFIKBAJL',
+  'ABCGHIJK':'CGHKBAJI','ABCGHIJL':'CGHIBAJL','ABCGHIKL':'CHIKBAGL',
+  'ABCGHJKL':'CGHKBAJL','ABCGIJKL':'CGIKBAJL','ABCHIJKL':'CHIKBAJL',
+  'ABDEFGHI':'DFHIBAGE','ABDEFGHJ':'DFHJBAGE','ABDEFGHK':'DFHKBAGE',
+  'ABDEFGHL':'DFHEBAGL','ABDEFGIJ':'DFEJBAGI','ABDEFGIK':'DFEKBAGI',
+  'ABDEFGIL':'DFEIBAGL','ABDEFGJK':'DFEKBAGJ','ABDEFGJL':'DFEJBAGL',
+  'ABDEFGKL':'DFEKBAGL','ABDEFHIJ':'DFHIBAJE','ABDEFHIK':'DFHKBAEI',
+  'ABDEFHIL':'DFHIBAEL','ABDEFHJK':'DFHKBAJE','ABDEFHJL':'DFHEBAJL',
+  'ABDEFHKL':'DFHKBAEL','ABDEFIJK':'DFEKBAJI','ABDEFIJL':'DFEIBAJL',
+  'ABDEFIKL':'DFEKBAIL','ABDEFJKL':'DFEKBAJL','ABDEGHIJ':'DGHIBAJE',
+  'ABDEGHIK':'DHEKBAGI','ABDEGHIL':'DHEIBAGL','ABDEGHJK':'DGHKBAJE',
+  'ABDEGHJL':'DGHEBAJL','ABDEGHKL':'DHEKBAGL','ABDEGIJK':'DGEKBAJI',
+  'ABDEGIJL':'DGEIBAJL','ABDEGIKL':'ADEKBIGL','ABDEGJKL':'DGEKBAJL',
+  'ABDEHIJK':'DHEKBAJI','ABDEHIJL':'DHEIBAJL','ABDEHIKL':'DHEKBAIL',
+  'ABDEHJKL':'DHEKBAJL','ABDEIJKL':'ADEKBIJL','ABDFGHIJ':'DFHJBAGI',
+  'ABDFGHIK':'DFHKBAGI','ABDFGHIL':'DFHIBAGL','ABDFGHJK':'DFHKBAGJ',
+  'ABDFGHJL':'DFHJBAGL','ABDFGHKL':'DFHKBAGL','ABDFGIJK':'DGFKBAJI',
+  'ABDFGIJL':'DGFIBAJL','ABDFGIKL':'DFIKBAGL','ABDFGJKL':'DGFKBAJL',
+  'ABDFHIJK':'DFHKBAJI','ABDFHIJL':'DFHIBAJL','ABDFHIKL':'DFHKBAIL',
+  'ABDFHJKL':'DFHKBAJL','ABDFIJKL':'DFIKBAJL','ABDGHIJK':'DGHKBAJI',
+  'ABDGHIJL':'DGHIBAJL','ABDGHIKL':'DHIKBAGL','ABDGHJKL':'DGHKBAJL',
+  'ABDGIJKL':'DGIKBAJL','ABDHIJKL':'DHIKBAJL','ABEFGHIJ':'FGHIBAJE',
+  'ABEFGHIK':'FHEKBAGI','ABEFGHIL':'FHEIBAGL','ABEFGHJK':'FGHKBAJE',
+  'ABEFGHJL':'FGHEBAJL','ABEFGHKL':'FHEKBAGL','ABEFGIJK':'FGEKBAJI',
+  'ABEFGIJL':'FGEIBAJL','ABEFGIKL':'AFEKBIGL','ABEFGJKL':'FGEKBAJL',
+  'ABEFHIJK':'FHEKBAJI','ABEFHIJL':'FHEIBAJL','ABEFHIKL':'FHEKBAIL',
+  'ABEFHJKL':'FHEKBAJL','ABEFIJKL':'AFEKBIJL','ABEGHIJK':'AGEKBHJI',
+  'ABEGHIJL':'AGEIBHJL','ABEGHIKL':'AHEKBIGL','ABEGHJKL':'AGEKBHJL',
+  'ABEGIJKL':'AGEKBIJL','ABEHIJKL':'AHEKBIJL','ABFGHIJK':'FGHKBAJI',
+  'ABFGHIJL':'FGHIBAJL','ABFGHIKL':'AFHKBIGL','ABFGHJKL':'FGHKBAJL',
+  'ABFGIJKL':'FGIKBAJL','ABFHIJKL':'AFHKBIJL','ABGHIJKL':'AGHKBIJL',
+  'ACDEFGHI':'CFHIEAGD','ACDEFGHJ':'CFHEJAGD','ACDEFGHK':'CFHKEAGD',
+  'ACDEFGHL':'CDHEFAGL','ACDEFGIJ':'DFCIJAGE','ACDEFGIK':'DFCKEAGI',
+  'ACDEFGIL':'DFCIEAGL','ACDEFGJK':'DFCKJAGE','ACDEFGJL':'DFCEJAGL',
+  'ACDEFGKL':'DFCKEAGL','ACDEFHIJ':'CFHIEAJD','ACDEFHIK':'CDHKFAEI',
+  'ACDEFHIL':'CDHIFAEL','ACDEFHJK':'CFHKEAJD','ACDEFHJL':'CDHEFAJL',
+  'ACDEFHKL':'CDHKFAEL','ACDEFIJK':'DFCKEAJI','ACDEFIJL':'DFCIEAJL',
+  'ACDEFIKL':'DFCKIAEL','ACDEFJKL':'DFCKEAJL','ACDEGHIJ':'CDHIJAGE',
+  'ACDEGHIK':'CDHKEAGI','ACDEGHIL':'CDHIEAGL','ACDEGHJK':'CDHKJAGE',
+  'ACDEGHJL':'CDHEJAGL','ACDEGHKL':'CDHKEAGL','ACDEGIJK':'CDEKJAGI',
+  'ACDEGIJL':'CDEIJAGL','ACDEGIKL':'CDEKIAGL','ACDEGJKL':'CDEKJAGL',
+  'ACDEHIJK':'CDHKEAJI','ACDEHIJL':'CDHIEAJL','ACDEHIKL':'CDHKIAEL',
+  'ACDEHJKL':'CDHKEAJL','ACDEIJKL':'CDEKIAJL','ACDFGHIJ':'CFHIJAGD',
+  'ACDFGHIK':'CDHKFAGI','ACDFGHIL':'CDHIFAGL','ACDFGHJK':'CFHKJAGD',
+  'ACDFGHJL':'DFCHJAGL','ACDFGHKL':'CDHKFAGL','ACDFGIJK':'DFCKJAGI',
+  'ACDFGIJL':'DFCIJAGL','ACDFGIKL':'DFCKIAGL','ACDFGJKL':'DFCKJAGL',
+  'ACDFHIJK':'CDHKFAJI','ACDFHIJL':'CDHIFAJL','ACDFHIKL':'CDHKIAFL',
+  'ACDFHJKL':'CDHKFAJL','ACDFIJKL':'DFCKIAJL','ACDGHIJK':'CDHKJAGI',
+  'ACDGHIJL':'CDHIJAGL','ACDGHIKL':'CDHKIAGL','ACDGHJKL':'CDHKJAGL',
+  'ACDGIJKL':'CDIKJAGL','ACDHIJKL':'CDHKIAJL','ACEFGHIJ':'CFHIJAGE',
+  'ACEFGHIK':'CFHKEAGI','ACEFGHIL':'CFHIEAGL','ACEFGHJK':'CFHKJAGE',
+  'ACEFGHJL':'CFHEJAGL','ACEFGHKL':'CFHKEAGL','ACEFGIJK':'CFEKJAGI',
+  'ACEFGIJL':'CFEIJAGL','ACEFGIKL':'CFEKIAGL','ACEFGJKL':'CFEKJAGL',
+  'ACEFHIJK':'CFHKEAJI','ACEFHIJL':'CFHIEAJL','ACEFHIKL':'CFHKIAEL',
+  'ACEFHJKL':'CFHKEAJL','ACEFIJKL':'CFEKIAJL','ACEGHIJK':'CHEKJAGI',
+  'ACEGHIJL':'CHEIJAGL','ACEGHIKL':'CHEKIAGL','ACEGHJKL':'CHEKJAGL',
+  'ACEGIJKL':'CGEKIAJL','ACEHIJKL':'CHEKIAJL','ACFGHIJK':'CFHKJAGI',
+  'ACFGHIJL':'CFHIJAGL','ACFGHIKL':'CFHKIAGL','ACFGHJKL':'CFHKJAGL',
+  'ACFGIJKL':'CFIKJAGL','ACFHIJKL':'CFHKIAJL','ACGHIJKL':'CGHKIAJL',
+  'ADEFGHIJ':'DFHIJAGE','ADEFGHIK':'DFHKEAGI','ADEFGHIL':'DFHIEAGL',
+  'ADEFGHJK':'DFHKJAGE','ADEFGHJL':'DFHEJAGL','ADEFGHKL':'DFHKEAGL',
+  'ADEFGIJK':'DFEKJAGI','ADEFGIJL':'DFEIJAGL','ADEFGIKL':'DFEKIAGL',
+  'ADEFGJKL':'DFEKJAGL','ADEFHIJK':'DFHKEAJI','ADEFHIJL':'DFHIEAJL',
+  'ADEFHIKL':'DFHKIAEL','ADEFHJKL':'DFHKEAJL','ADEFIJKL':'DFEKIAJL',
+  'ADEGHIJK':'DHEKJAGI','ADEGHIJL':'DHEIJAGL','ADEGHIKL':'DHEKIAGL',
+  'ADEGHJKL':'DHEKJAGL','ADEGIJKL':'DGEKIAJL','ADEHIJKL':'DHEKIAJL',
+  'ADFGHIJK':'DFHKJAGI','ADFGHIJL':'DFHIJAGL','ADFGHIKL':'DFHKIAGL',
+  'ADFGHJKL':'DFHKJAGL','ADFGIJKL':'DFIKJAGL','ADFHIJKL':'DFHKIAJL',
+  'ADGHIJKL':'DGHKIAJL','AEFGHIJK':'FHEKJAGI','AEFGHIJL':'FHEIJAGL',
+  'AEFGHIKL':'FHEKIAGL','AEFGHJKL':'FHEKJAGL','AEFGIJKL':'FGEKIAJL',
+  'AEFHIJKL':'FHEKIAJL','AEGHIJKL':'AGEKIHJL','AFGHIJKL':'FGHKIAJL',
+  'BCDEFGHI':'DFCIBHGE','BCDEFGHJ':'CFHEBJGD','BCDEFGHK':'DFCKBHGE',
+  'BCDEFGHL':'DFCEBHGL','BCDEFGIJ':'DFCIBJGE','BCDEFGIK':'DFCKBEGI',
+  'BCDEFGIL':'DFCIBEGL','BCDEFGJK':'DFCKBJGE','BCDEFGJL':'DFCEBJGL',
+  'BCDEFGKL':'DFCKBEGL','BCDEFHIJ':'DFCIBHJE','BCDEFHIK':'DFCKBHEI',
+  'BCDEFHIL':'DFCIBHEL','BCDEFHJK':'DFCKBHJE','BCDEFHJL':'DFCEBHJL',
+  'BCDEFHKL':'DFCKBHEL','BCDEFIJK':'DFCKBEJI','BCDEFIJL':'DFCIBEJL',
+  'BCDEFIKL':'DFCKBIEL','BCDEFJKL':'DFCKBEJL','BCDEGHIJ':'CDHIBJGE',
+  'BCDEGHIK':'CDEKBHGI','BCDEGHIL':'CDEIBHGL','BCDEGHJK':'CDHKBJGE',
+  'BCDEGHJL':'CDHEBJGL','BCDEGHKL':'CDEKBHGL','BCDEGIJK':'CDEKBJGI',
+  'BCDEGIJL':'CDEIBJGL','BCDEGIKL':'CDEKBIGL','BCDEGJKL':'CDEKBJGL',
+  'BCDEHIJK':'CDEKBHJI','BCDEHIJL':'CDEIBHJL','BCDEHIKL':'CDEKBHIL',
+  'BCDEHJKL':'CDEKBHJL','BCDEIJKL':'CDEKBIJL','BCDFGHIJ':'CFHIBJGD',
+  'BCDFGHIK':'DFCKBHGI','BCDFGHIL':'DFCIBHGL','BCDFGHJK':'CFHKBJGD',
+  'BCDFGHJL':'DFCJBHGL','BCDFGHKL':'DFCKBHGL','BCDFGIJK':'DFCKBJGI',
+  'BCDFGIJL':'DFCIBJGL','BCDFGIKL':'DFCKBIGL','BCDFGJKL':'DFCKBJGL',
+  'BCDFHIJK':'DFCKBHJI','BCDFHIJL':'DFCIBHJL','BCDFHIKL':'DFCKBHIL',
+  'BCDFHJKL':'DFCKBHJL','BCDFIJKL':'DFCKBIJL','BCDGHIJK':'CDHKBJGI',
+  'BCDGHIJL':'CDHIBJGL','BCDGHIKL':'CDHKBIGL','BCDGHJKL':'CDHKBJGL',
+  'BCDGIJKL':'CDIKBJGL','BCDHIJKL':'CDHKBIJL','BCEFGHIJ':'CFHIBJGE',
+  'BCEFGHIK':'CFEKBHGI','BCEFGHIL':'CFEIBHGL','BCEFGHJK':'CFHKBJGE',
+  'BCEFGHJL':'CFHEBJGL','BCEFGHKL':'CFEKBHGL','BCEFGIJK':'CFEKBJGI',
+  'BCEFGIJL':'CFEIBJGL','BCEFGIKL':'CFEKBIGL','BCEFGJKL':'CFEKBJGL',
+  'BCEFHIJK':'CFEKBHJI','BCEFHIJL':'CFEIBHJL','BCEFHIKL':'CFEKBHIL',
+  'BCEFHJKL':'CFEKBHJL','BCEFIJKL':'CFEKBIJL','BCEGHIJK':'CGEKBHJI',
+  'BCEGHIJL':'CGEIBHJL','BCEGHIKL':'CHEKBIGL','BCEGHJKL':'CGEKBHJL',
+  'BCEGIJKL':'CGEKBIJL','BCEHIJKL':'CHEKBIJL','BCFGHIJK':'CFHKBJGI',
+  'BCFGHIJL':'CFHIBJGL','BCFGHIKL':'CFHKBIGL','BCFGHJKL':'CFHKBJGL',
+  'BCFGIJKL':'CFIKBJGL','BCFHIJKL':'CFHKBIJL','BCGHIJKL':'CGHKBIJL',
+  'BDEFGHIJ':'DFHIBJGE','BDEFGHIK':'DFEKBHGI','BDEFGHIL':'DFEIBHGL',
+  'BDEFGHJK':'DFHKBJGE','BDEFGHJL':'DFHEBJGL','BDEFGHKL':'DFEKBHGL',
+  'BDEFGIJK':'DFEKBJGI','BDEFGIJL':'DFEIBJGL','BDEFGIKL':'DFEKBIGL',
+  'BDEFGJKL':'DFEKBJGL','BDEFHIJK':'DFEKBHJI','BDEFHIJL':'DFEIBHJL',
+  'BDEFHIKL':'DFEKBHIL','BDEFHJKL':'DFEKBHJL','BDEFIJKL':'DFEKBIJL',
+  'BDEGHIJK':'DGEKBHJI','BDEGHIJL':'DGEIBHJL','BDEGHIKL':'DHEKBIGL',
+  'BDEGHJKL':'DGEKBHJL','BDEGIJKL':'DGEKBIJL','BDEHIJKL':'DHEKBIJL',
+  'BDFGHIJK':'DFHKBJGI','BDFGHIJL':'DFHIBJGL','BDFGHIKL':'DFHKBIGL',
+  'BDFGHJKL':'DFHKBJGL','BDFGIJKL':'DFIKBJGL','BDFHIJKL':'DFHKBIJL',
+  'BDGHIJKL':'DGHKBIJL','BEFGHIJK':'FGEKBHJI','BEFGHIJL':'FGEIBHJL',
+  'BEFGHIKL':'FHEKBIGL','BEFGHJKL':'FGEKBHJL','BEFGIJKL':'FGEKBIJL',
+  'BEFHIJKL':'FHEKBIJL','BEGHIJKL':'BGEKIHJL','BFGHIJKL':'FGHKBIJL',
+  'CDEFGHIJ':'DFCIJHGE','CDEFGHIK':'DFCKEHGI','CDEFGHIL':'DFCIEHGL',
+  'CDEFGHJK':'DFCKJHGE','CDEFGHJL':'DFCEJHGL','CDEFGHKL':'DFCKEHGL',
+  'CDEFGIJK':'DFCKEJGI','CDEFGIJL':'DFCIEJGL','CDEFGIKL':'DFCKEIGL',
+  'CDEFGJKL':'DFCKEJGL','CDEFHIJK':'DFCKEHJI','CDEFHIJL':'DFCIEHJL',
+  'CDEFHIKL':'DFCKIHEL','CDEFHJKL':'DFCKEHJL','CDEFIJKL':'DFCKEIJL',
+  'CDEGHIJK':'CDEKJHGI','CDEGHIJL':'CDEIJHGL','CDEGHIKL':'CDEKIHGL',
+  'CDEGHJKL':'CDEKJHGL','CDEGIJKL':'CDEKIJGL','CDEHIJKL':'CDEKIHJL',
+  'CDFGHIJK':'DFCKJHGI','CDFGHIJL':'DFCIJHGL','CDFGHIKL':'DFCKIHGL',
+  'CDFGHJKL':'DFCKJHGL','CDFGIJKL':'DFCKIJGL','CDFHIJKL':'DFCKIHJL',
+  'CDGHIJKL':'CDHKIJGL','CEFGHIJK':'CFEKJHGI','CEFGHIJL':'CFEIJHGL',
+  'CEFGHIKL':'CFEKIHGL','CEFGHJKL':'CFEKJHGL','CEFGIJKL':'CFEKIJGL',
+  'CEFHIJKL':'CFEKIHJL','CEGHIJKL':'CGEKIHJL','CFGHIJKL':'CFHKIJGL',
+  'DEFGHIJK':'DFEKJHGI','DEFGHIJL':'DFEIJHGL','DEFGHIKL':'DFEKIHGL',
+  'DEFGHJKL':'DFEKJHGL','DEFGIJKL':'DFEKIJGL','DEFHIJKL':'DFEKIHJL',
+  'DEGHIJKL':'DGEKIHJL','DFGHIJKL':'DFHKIJGL','EFGHIJKL':'FGEKIHJL',
+};
+
+const R32_MATCHES = [
+  { id:'M73', home:'2A', away:'2B' },
+  { id:'M74', home:'1E', mslot:0 },
+  { id:'M75', home:'1F', away:'2C' },
+  { id:'M76', home:'1C', away:'2F' },
+  { id:'M77', home:'1I', mslot:1 },
+  { id:'M78', home:'2E', away:'2I' },
+  { id:'M79', home:'1A', mslot:2 },
+  { id:'M80', home:'1L', mslot:3 },
+  { id:'M81', home:'1D', mslot:4 },
+  { id:'M82', home:'1G', mslot:5 },
+  { id:'M83', home:'2K', away:'2L' },
+  { id:'M84', home:'1H', away:'2J' },
+  { id:'M85', home:'1B', mslot:6 },
+  { id:'M86', home:'1J', away:'2H' },
+  { id:'M87', home:'1K', mslot:7 },
+  { id:'M88', home:'2D', away:'2G' },
+];
+
 // ── State ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'wcDraft2026';
@@ -669,13 +928,14 @@ function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 // ── Tabs ───────────────────────────────────────────────────────────────────
 
 function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(name === 'order' ? 'draft' : 'manual'));
-  });
-  document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.id === `tab-${name}`);
+    const m = b.getAttribute('onclick')?.match(/showTab\('(\w+)'\)/);
+    b.classList.toggle('active', m?.[1] === name);
   });
   if (name === 'manual') renderGroups();
+  if (name === 'projected') renderProjectedBracket();
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -795,18 +1055,7 @@ function renderGroupsRO() {
     const card = document.createElement('div');
     card.className = 'group-card-ro';
 
-    const sorted = [...teams].sort((a, b) => {
-      const ga = state.results[a]?.groupStats;
-      const gb = state.results[b]?.groupStats;
-      if (!ga && !gb) return 0;
-      if (!ga) return 1;
-      if (!gb) return -1;
-      const ptsA = ga.w * 3 + ga.d, ptsB = gb.w * 3 + gb.d;
-      if (ptsB !== ptsA) return ptsB - ptsA;
-      const gdA = ga.gf - ga.ga, gdB = gb.gf - gb.ga;
-      if (gdB !== gdA) return gdB - gdA;
-      return gb.gf - ga.gf;
-    });
+    const sorted = rankGroupTeams(grp);
 
     const rows = sorted.map(team => {
       const res = state.results[team] || { round: -1 };
@@ -831,17 +1080,74 @@ function renderGroupsRO() {
     card.innerHTML = `
       <div class="group-header">Group ${grp}</div>
       <table class="group-standings">
-        <thead>
-          <tr>
-            <th class="th-team">Team</th>
-            <th>Pts</th><th>GF</th><th>GA</th><th></th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th class="th-team">Team</th>
+          <th>Pts</th><th>GF</th><th>GA</th><th></th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
     grid.appendChild(card);
   });
+  renderThirdPlaceTable();
+}
+
+// ── Render 3rd Place Table ────────────────────────────────────────────────
+
+function renderThirdPlaceTable() {
+  const container = document.getElementById('third-place-table');
+  if (!container) return;
+
+  const thirds = Object.entries(GROUPS).map(([letter]) => {
+    const ranked = rankGroupTeams(letter);
+    const team = ranked[2];
+    const s = state.results[team]?.groupStats || { w:0, d:0, l:0, gf:0, ga:0 };
+    const pts = s.w * 3 + s.d;
+    return { team, letter, pts, gd: s.gf - s.ga, gf: s.gf, rank: FIFA_RANKINGS[team] || 999 };
+  });
+  thirds.sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return a.rank - b.rank;
+  });
+
+  const rows = thirds.map((t, i) => {
+    const adv = i < 8;
+    const flag = FLAGS[t.team] || '🏳';
+    const owner = ownerName(t.team);
+    const s = state.results[t.team]?.groupStats;
+    const gdStr = t.gd > 0 ? '+' + t.gd : String(t.gd);
+    const gdCls = t.gd > 0 ? 'gd-pos' : t.gd < 0 ? 'gd-neg' : 'gd-zero';
+    const cutoff = i === 8 ? ' third-cutoff' : '';
+    return `<tr class="${adv ? 'third-adv' : ''}${cutoff}">
+      <td class="rank-cell" style="color:var(--muted)">${i + 1}</td>
+      <td style="text-align:center;font-size:0.75rem;font-weight:700;color:var(--muted);padding:0.5rem 0.6rem">${t.letter}</td>
+      <td>
+        <div style="font-size:0.82rem;font-weight:600">${flag} ${esc(t.team)}</div>
+        <div style="font-size:0.62rem;color:var(--muted)">${esc(owner)}</div>
+      </td>
+      <td class="stat-cell">${s ? t.pts : '—'}</td>
+      <td class="stat-cell ${s ? gdCls : 'stat-na'}">${s ? gdStr : '—'}</td>
+      <td class="stat-cell">${s ? t.gf : '—'}</td>
+      <td class="stat-cell"><span class="chip ${adv ? 'chip-r32' : 'chip-out'}">${adv ? 'ADV' : 'OUT'}</span></td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<div style="overflow-x:auto">
+    <table class="draft-table">
+      <thead><tr>
+        <th style="text-align:center">#</th>
+        <th style="text-align:center">Grp</th>
+        <th>Team</th>
+        <th style="text-align:center">Pts</th>
+        <th style="text-align:center">GD</th>
+        <th style="text-align:center">GF</th>
+        <th style="text-align:center">Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <p class="footer-note">Top 8 of 12 advance &middot; Ranked by Pts &rarr; GD &rarr; GF &rarr; FIFA ranking</p>`;
 }
 
 // ── Render Groups (manual entry) ──────────────────────────────────────────
@@ -931,6 +1237,230 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Group ranking (with H2H + fair-play) ──────────────────────────────────
+
+function rankGroupTeams(letter) {
+  const teams = GROUPS[letter];
+  const gms = allNormalized.filter(m =>
+    m.stage === 'group-stage' && m.completed &&
+    teams.includes(m.home.name) && teams.includes(m.away.name)
+  );
+
+  function gs(team) {
+    return state.results[team]?.groupStats || { w:0, d:0, l:0, gf:0, ga:0 };
+  }
+  function ptOf(t) { const s = gs(t); return s.w * 3 + s.d; }
+
+  function fairPlay(team) {
+    const c = teamCards[team];
+    return c ? -(c.yellow + c.red * 3) : 0;
+  }
+
+  function overallSort(a, b) {
+    const sa = gs(a), sb = gs(b);
+    const gdA = sa.gf - sa.ga, gdB = sb.gf - sb.ga;
+    if (gdB !== gdA) return gdB - gdA;
+    if (sb.gf !== sa.gf) return sb.gf - sa.gf;
+    const fpA = fairPlay(a), fpB = fairPlay(b);
+    if (fpB !== fpA) return fpB - fpA;
+    return (FIFA_RANKINGS[a] || 999) - (FIFA_RANKINGS[b] || 999);
+  }
+
+  function h2hStats(team, matches) {
+    let w = 0, d = 0, gf = 0, ga = 0;
+    for (const m of matches.filter(x => x.home.name === team || x.away.name === team)) {
+      const ih = m.home.name === team;
+      const myG = ih ? m.home.goals : m.away.goals;
+      const opG = ih ? m.away.goals : m.home.goals;
+      gf += myG; ga += opG;
+      if (myG > opG) w++; else if (myG === opG) d++;
+    }
+    return { pts: w * 3 + d, gd: gf - ga, gf };
+  }
+
+  function sortSub(sub) {
+    if (sub.length <= 1) return sub;
+    const h2hMs = gms.filter(m => sub.includes(m.home.name) && sub.includes(m.away.name));
+    const stats = Object.fromEntries(sub.map(t => [t, h2hStats(t, h2hMs)]));
+    const sorted = [...sub].sort((a, b) => {
+      const ha = stats[a], hb = stats[b];
+      if (hb.pts !== ha.pts) return hb.pts - ha.pts;
+      if (hb.gd  !== ha.gd)  return hb.gd  - ha.gd;
+      return hb.gf - ha.gf;
+    });
+    const result = [];
+    let i = 0;
+    while (i < sorted.length) {
+      let j = i + 1;
+      while (j < sorted.length) {
+        const a = stats[sorted[j-1]], b = stats[sorted[j]];
+        if (a.pts === b.pts && a.gd === b.gd && a.gf === b.gf) j++; else break;
+      }
+      const tier = sorted.slice(i, j);
+      if (tier.length === 1)             result.push(tier[0]);
+      else if (tier.length < sub.length) result.push(...sortSub(tier));
+      else                               result.push(...[...tier].sort(overallSort));
+      i = j;
+    }
+    return result;
+  }
+
+  const byPts = [...teams].sort((a, b) => ptOf(b) - ptOf(a));
+  const result = [];
+  let i = 0;
+  while (i < byPts.length) {
+    let j = i + 1;
+    while (j < byPts.length && ptOf(byPts[j]) === ptOf(byPts[i])) j++;
+    const tier = byPts.slice(i, j);
+    result.push(...(tier.length === 1 ? tier : sortSub(tier)));
+    i = j;
+  }
+  return result;
+}
+
+function getBest8ThirdPlace() {
+  const thirds = Object.entries(GROUPS).map(([letter]) => {
+    const ranked = rankGroupTeams(letter);
+    const team = ranked[2];
+    const s = state.results[team]?.groupStats || { w:0, d:0, l:0, gf:0, ga:0 };
+    const pts = s.w * 3 + s.d;
+    return { team, letter, pts, gd: s.gf - s.ga, gf: s.gf, rank: FIFA_RANKINGS[team] || 999 };
+  });
+  thirds.sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return a.rank - b.rank;
+  });
+  return thirds.slice(0, 8);
+}
+
+function getProjectedR32() {
+  const standings = {};
+  for (const letter of Object.keys(GROUPS)) standings[letter] = rankGroupTeams(letter);
+
+  const best8 = getBest8ThirdPlace();
+  const groups8 = best8.map(t => t.letter).sort().join('');
+  const slotStr = THIRD_COMBOS[groups8] || '';
+  const thirdByGroup = Object.fromEntries(best8.map(t => [t.letter, t.team]));
+  const thirdSlots = [...(slotStr || '        ')].map(g => thirdByGroup[g] || null);
+
+  function resolve(slot, mslot) {
+    if (mslot !== undefined) return thirdSlots[mslot] || null;
+    if (!slot) return null;
+    const m = slot.match(/^([12])([A-L])$/);
+    if (!m) return null;
+    return standings[m[2]]?.[parseInt(m[1]) - 1] || null;
+  }
+
+  return R32_MATCHES.map(m => ({
+    ...m,
+    homeTeam: resolve(m.home),
+    awayTeam: resolve(m.away, m.mslot),
+  }));
+}
+
+function buildProjMatchCard(homeTeam, awayTeam) {
+  function row(team) {
+    if (!team) return `<div class="match-team-row mt-tbd">
+      <span class="match-flag"></span>
+      <div class="match-info"><span class="match-name">TBD</span></div>
+    </div>`;
+    const flag  = FLAGS[team] || '🏳';
+    const owner = ownerName(team);
+    return `<div class="match-team-row">
+      <span class="match-flag">${flag}</span>
+      <div class="match-info">
+        <span class="match-name">${esc(team)}</span>
+        ${owner !== '?' ? `<span class="match-owner">${esc(owner)}</span>` : ''}
+      </div>
+    </div>`;
+  }
+  return `<div class="match-card">${row(homeTeam)}${row(awayTeam)}</div>`;
+}
+
+function renderProjBracketCols() {
+  const container = document.getElementById('proj-bracket-cols');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let r32;
+  try { r32 = getProjectedR32(); }
+  catch(e) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:1rem 0">Bracket will populate once group stage data is available.</p>';
+    return;
+  }
+
+  const STAGES = [
+    { label:'R32',   count:16 },
+    { label:'R16',   count:8  },
+    { label:'QF',    count:4  },
+    { label:'SF',    count:2  },
+    { label:'Final', count:1  },
+  ];
+
+  STAGES.forEach(stage => {
+    const col = document.createElement('div');
+    col.className = 'bracket-col';
+    let html = '';
+    if (stage.label === 'R32') {
+      html = r32.map(m => buildProjMatchCard(m.homeTeam, m.awayTeam)).join('');
+    } else {
+      for (let i = 0; i < stage.count; i++) html += `<div class="match-placeholder">TBD</div>`;
+    }
+    if (stage.label === 'Final') {
+      html += `<div class="third-place-sep">3rd Place</div><div class="match-placeholder">TBD</div>`;
+    }
+    col.innerHTML = `<div class="bracket-col-header">${stage.label}</div><div class="bracket-matches">${html}</div>`;
+    container.appendChild(col);
+  });
+}
+
+function renderProjectedBracket() {
+  const banner = document.getElementById('proj-banner');
+  if (banner) banner.style.display = new Date() < new Date('2026-06-28T09:00:00-04:00') ? '' : 'none';
+  renderProjBracketCols();
+}
+
+async function fetchGroupCards(normalized) {
+  const groupDone = normalized.filter(m => m.stage === 'group-stage' && m.completed && m.id);
+  const toFetch   = groupDone.filter(m => !cardCache[m.id]);
+
+  if (toFetch.length) {
+    const summaries = await Promise.all(
+      toFetch.map(m =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=${m.id}`)
+          .then(r => r.ok ? r.json() : null).catch(() => null)
+      )
+    );
+    toFetch.forEach((m, i) => {
+      const s = summaries[i];
+      if (!s) return;
+      const entry = {};
+      (s.boxscore?.teams || []).forEach(t => {
+        const name  = normName(t.team?.displayName || '');
+        const stats = t.statistics || [];
+        const get   = key => parseInt(stats.find(x => x.name === key)?.displayValue || '0');
+        entry[name] = { yellow: get('yellowCards'), red: get('redCards') };
+      });
+      cardCache[m.id] = entry;
+    });
+    localStorage.setItem('wcCards2026', JSON.stringify(cardCache));
+  }
+
+  const result = {};
+  for (const m of groupDone) {
+    const cached = cardCache[m.id];
+    if (!cached) continue;
+    for (const [team, cards] of Object.entries(cached)) {
+      if (!result[team]) result[team] = { yellow: 0, red: 0 };
+      result[team].yellow += cards.yellow;
+      result[team].red    += cards.red;
+    }
+  }
+  return result;
+}
+
 // ── API Sync ───────────────────────────────────────────────────────────────
 
 const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
@@ -949,6 +1479,7 @@ const API_NAME_MAP = {
   'Democratic Republic of Congo':     'DR Congo',
   'Democratic Republic of the Congo': 'DR Congo',
   'Türkiye':                          'Turkey',
+  'IR Iran':                          'Iran',
 };
 
 function normName(n) { return API_NAME_MAP[n] || n; }
@@ -973,6 +1504,7 @@ function normalizeEvent(event, queryDate) {
   const away = competitors.find(c => c.homeAway === 'away');
   if (!home || !away) return null;
   return {
+    id:        event.id || '',
     date:      queryDate || event.date.slice(0, 10),
     utcDate:   event.date || '',
     stage:     slug,
@@ -1038,6 +1570,8 @@ function espnDateStr(d) {
 let syncPaused    = false;
 let syncTimer     = null;
 let allNormalized = [];
+let teamCards     = {};
+let cardCache     = JSON.parse(localStorage.getItem('wcCards2026') || '{}');
 let scheduleDate  = new Date().toISOString().slice(0, 10);
 let rankMovements = {};
 
@@ -1064,6 +1598,7 @@ async function syncNow() {
     }).filter(Boolean);
     const normalized = allNormalized;
     renderSchedule();
+    teamCards = await fetchGroupCards(allNormalized);
 
     // Snapshot state before updates so baseline for rank-movement arrows is pre-live
     const prevResults = {};
@@ -1117,6 +1652,7 @@ async function syncNow() {
       renderOrder();
       renderGroupsRO();
       if (document.getElementById('tab-manual').classList.contains('active')) renderGroups();
+      if (document.getElementById('tab-projected')?.classList.contains('active')) renderProjectedBracket();
     }
 
     // Adaptive polling: 15s during live games, 90s otherwise
@@ -1330,7 +1866,6 @@ if (new Date() >= new Date('2026-06-11')) {
 }
 
 if (new URLSearchParams(location.search).has('admin')) {
-  document.getElementById('tabs-nav').style.display = '';
   document.getElementById('manual-tab-btn').style.display = '';
 }
 </script>
