@@ -456,6 +456,46 @@
       text-align: center; font-size: 0.65rem; color: var(--muted);
       text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
     }
+    /* ── Teams Still Alive ── */
+    .alive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .alive-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+    .alive-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.45rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #e8e8f0;
+    }
+    .alive-owner-name { font-weight: 700; font-size: 0.85rem; }
+    .alive-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 10px;
+    }
+    .alive-badge-in  { background: var(--accent); color: #fff; }
+    .alive-badge-out { background: var(--surface2); color: var(--muted); }
+    .alive-team-row {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.18rem 0;
+      font-size: 0.78rem;
+    }
+    .alive-team-row.team-in  { color: var(--text); font-weight: 500; }
+    .alive-team-row.team-out { color: var(--muted); }
+    .alive-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -568,6 +608,11 @@
   <div class="tab-panel" id="tab-projected">
 
     <div class="proj-banner" id="proj-banner">BASED ON CURRENT STANDINGS &mdash; NOT FINAL</div>
+
+    <section>
+      <h2>Teams Still Alive</h2>
+      <div class="alive-grid" id="alive-grid"></div>
+    </section>
 
     <section>
       <h2>Projected Knockout Bracket</h2>
@@ -935,7 +980,7 @@ function showTab(name) {
     b.classList.toggle('active', m?.[1] === name);
   });
   if (name === 'manual') renderGroups();
-  if (name === 'projected') renderProjectedBracket();
+  if (name === 'projected') { renderProjectedBracket(); renderAlive(); }
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -1090,6 +1135,7 @@ function renderGroupsRO() {
     grid.appendChild(card);
   });
   renderThirdPlaceTable();
+  renderAlive();
 }
 
 // ── Render 3rd Place Table ────────────────────────────────────────────────
@@ -1148,6 +1194,37 @@ function renderThirdPlaceTable() {
       <tbody>${rows}</tbody>
     </table></div>
     <p class="footer-note">Top 8 of 12 advance &middot; Ranked by Pts &rarr; GD &rarr; GF &rarr; FIFA ranking</p>`;
+}
+
+// ── Teams Still Alive ─────────────────────────────────────────────────────
+
+function renderAlive() {
+  const grid = document.getElementById('alive-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  FANTASY_TEAMS.forEach(ft => {
+    const alive = ft.teams.filter(t => (state.results[t]?.round ?? -1) === -1);
+    const badgeCls = alive.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
+    const rows = ft.teams.map(t => {
+      const round = state.results[t]?.round ?? -1;
+      const isIn = round === -1;
+      const [cc, cl] = ROUND_CHIP[String(round)] || ROUND_CHIP['-1'];
+      const flag = FLAGS[t] || '🏳';
+      return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
+        <span>${flag}</span>
+        <span class="alive-team-name">${esc(t)}</span>
+        ${!isIn ? `<span class="chip ${cc} chip-sm">${cl}</span>` : ''}
+      </div>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'alive-card';
+    card.innerHTML = `
+      <div class="alive-card-header">
+        <span class="alive-owner-name">${esc(ft.defaultName)}</span>
+        <span class="alive-badge ${badgeCls}">${alive.length}/4</span>
+      </div>${rows}`;
+    grid.appendChild(card);
+  });
 }
 
 // ── Render Groups (manual entry) ──────────────────────────────────────────

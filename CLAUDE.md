@@ -52,7 +52,6 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 
 | Branch | Status | Notes |
 |--------|--------|-------|
-| `knockout-bracket` | PR #1 open, auto-merges 2026-06-28 9am ET via scheduled remote agent | Adds public Bracket tab + Teams Still Alive |
 | `opta-predictions` | Parked, no PR | Adds public Odds tab with Opta pre-tournament predictions. Simulator idea shelved pending group interest — would need team strength ratings or per-match odds (stage probabilities we have are simulation outputs, not inputs). |
 
 Main tab nav is now always visible; Manual Entry is admin-only (`?admin`).
@@ -65,8 +64,7 @@ Main tab nav is now always visible; Manual Entry is admin-only (`?admin`).
 
 ### Tabs
 - **Draft Order** — ranked table + read-only groups grid + Best 3rd Place Teams table. Public.
-- **Projected** — projected R32 bracket based on current group standings. Public. On `main`.
-- **Bracket** — live knockout bracket (column-per-round) + Teams Still Alive grid. Public. On `knockout-bracket` branch (merges 2026-06-28).
+- **Projected** — projected R32 bracket + Teams Still Alive grid. Public. On `main`.
 - **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public. On `opta-predictions` branch (parked).
 - **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only (`?admin`).
 
@@ -101,17 +99,10 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - **`getProjectedR32()`** — calls `getBest8ThirdPlace()`, builds the sorted 8-group key, looks up `THIRD_COMBOS`, returns a slot→team map for all 32 R32 participants.
 - **`buildProjMatchCard(homeTeam, awayTeam)`** — reuses `.match-card` CSS; shows flag + team name + fantasy owner. No scores shown.
 - **`renderProjBracketCols()`** — renders R32 column from projected standings + TBD columns for later rounds.
+- **`renderAlive()`** — renders the Teams Still Alive grid (12 owner cards). Each card shows owner name, `X/4` alive badge (purple when >0, gray when 0), and all 4 teams with eliminated ones dimmed + round chip. Called from `renderOrder()` and on tab switch to Projected.
 - **Best 3rd Place Teams table** (bottom of Draft Order tab): shows all 12 3rd-place teams ranked, top 8 highlighted in gold with "ADV" badge, dividing line before 9th place. Rendered by `renderThirdPlaceTable()`, called from `renderOrder()`.
 - **`fetchGroupCards(normalized)`** — async, called in `syncNow()`. Fetches ESPN summary endpoint (`/summary?event={id}`) for all completed group-stage matches not already in `cardCache`. Parses `yellowCards` + `redCards` from `boxscore.teams[].statistics` and populates `teamCards` (module-level). Results persisted to `wcCards2026` localStorage key.
 - **Temporary banner**: shown above Projected tab content until 2026-06-28T09:00:00-04:00 (9am ET). Notes that bracket will update as group stage completes. Uses explicit timezone offset to avoid UTC-midnight parse bug.
-
-### Bracket Tab (knockout-bracket branch)
-- Column-per-round layout: R32 → R16 → QF → SF → Final. 3rd place match appears below the Final column. Horizontally scrollable.
-- Each match card shows flag emoji, WC team name, and fantasy owner. Completed matches highlight the winner and dim the loser. Live matches get a green border.
-- TBD slots show placeholder cards until API data arrives. Empty state shows a "waiting for 2026 data" message.
-- **Teams Still Alive** section above the bracket: 12 owner cards in a responsive grid. Each shows the owner's 4 teams with status chips for eliminated teams and an `X/4` alive badge (purple when > 0, gray when 0). A team is "alive" when `round === -1`.
-- `bracketMatches` — module-level array (not persisted to localStorage) populated by `syncNow()` from all KO stage matches. `renderBracketCols()` is called when this updates. `renderAlive()` is called from `renderOrder()` so the alive grid stays current with any result change.
-- KO stage names captured: `Round of 32`, `Round of 16`, `Quarter-final`, `Quarter-finals`, `Semi-final`, `Semi-finals`, `Final`, `Play-off for third place`, `Third place play-off`.
 
 ### Odds Tab (opta-predictions branch)
 - Sortable table: all 48 WC teams × 7 columns — Top Group, R32, R16, QF, SF, Final, 🏆 (champion). Data from Opta via The Analyst, hardcoded pre-tournament (June 2026).
@@ -134,7 +125,6 @@ Pulls from the ESPN scoreboard API (`https://site.api.espn.com/apis/site/v2/spor
 - Team name normalization handles API variants (e.g. "United States" → "USA", "South Korea" → "Korea Republic", "Türkiye" → "Turkey")
 - KO stage logic correctly resolves 3rd/4th place: 3rd-place game winner = round 5, loser = round 4
 - Manual Entry data is preserved; API only writes when it has completed match data
-- On each sync, KO stage matches are also captured into `bracketMatches` and `renderBracketCols()` is called (bracket tab feature, on `knockout-bracket` branch)
 
 ## Visual Design
 
