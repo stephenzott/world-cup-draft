@@ -55,17 +55,20 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 | `knockout-bracket` | PR #1 open, auto-merges 2026-06-28 9am ET via scheduled remote agent | Adds public Bracket tab + Teams Still Alive |
 | `opta-predictions` | Parked, no PR | Adds public Odds tab with Opta pre-tournament predictions. Simulator idea shelved pending group interest — would need team strength ratings or per-match odds (stage probabilities we have are simulation outputs, not inputs). |
 
-Both branches also make the tab nav always visible and move Manual Entry to admin-only. Main currently keeps tab nav admin-gated.
+Main tab nav is now always visible; Manual Entry is admin-only (`?admin`).
+
+## TODO
+
+- **Extend bracket to full R16/QF/SF/Final**: The Projected tab currently only populates the R32 column from group standings. The R16, QF, SF, Final columns show static "TBD" placeholders. Once the knockout stage begins (≈2026-07-04), wire actual match results into those columns so the bracket tracks real progress. The `knockout-bracket` branch has `bracketMatches` + `renderBracketCols()` that pulls live KO data from the ESPN scoreboard — merging that branch (scheduled 2026-06-28) will be the foundation; the Projected tab should then consume those results for the later rounds.
 
 ## UI
 
 ### Tabs
-- **Draft Order** — ranked table + read-only groups grid
-- **Bracket** — knockout bracket (column-per-round) + Teams Still Alive grid. Public tab. On `knockout-bracket` branch (merges 2026-06-28).
-- **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public tab. On `opta-predictions` branch (parked).
-- **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only.
-
-On `main`: tab nav is admin-gated (shown only with `?admin`). On feature branches: tab nav always visible, Manual Entry button hidden unless `?admin`.
+- **Draft Order** — ranked table + read-only groups grid + Best 3rd Place Teams table. Public.
+- **Projected** — projected R32 bracket based on current group standings. Public. On `main`.
+- **Bracket** — live knockout bracket (column-per-round) + Teams Still Alive grid. Public. On `knockout-bracket` branch (merges 2026-06-28).
+- **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public. On `opta-predictions` branch (parked).
+- **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only (`?admin`).
 
 ### Header
 A **tournament stage pill** in the sync-bar reflects the current stage derived from the highest round in state: Group Stage → Round of 32 → Round of 16 → Quarter-Finals → Semi-Finals → Final → Complete. Updates every time `renderOrder()` runs.
@@ -84,9 +87,23 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 ### Groups Grid
 - Read-only grid: 3 columns default → 2 (≤1100px) → 2 (≤768px) → 1 (≤480px)
 - Manual entry grid: 4 columns default → 3 (≤1100px) → 2 (≤768px) → 1 (≤480px)
-- Read-only view shows a FIFA-style standings table per group: **Team | Pts | GF | GA | chip**, sorted by Pts → GD → GF. Group-stage stats (W/D/L/GF/GA) are stored in `state.results[team].groupStats` — computed from API group-stage matches only (`stage_name === 'First stage'`), separate from the total-tournament `gf/ga` used for fantasy scoring. If no API data, cells show `—`.
+- Read-only view shows a FIFA-style standings table per group: **Team | Pts | GF | GA | chip**, sorted by Pts → GD → GF. Group-stage stats (W/D/L/GF/GA) are stored in `state.results[team].groupStats` — computed from API group-stage matches only (`stage === 'group-stage'`), separate from the total-tournament `gf/ga` used for fantasy scoring. If no API data, cells show `—`.
 - Manual entry view adds round dropdown and goals for/against inputs
 - `renderGroups()` (manual entry form) is only rebuilt when switching to the Manual Entry tab or when an API sync fires while that tab is already active — avoids unnecessary DOM reconstruction
+
+### Projected Tab
+- Shows a column-per-round bracket layout (R32 → R16 → QF → SF → Final). R32 is populated from projected group standings; later rounds show TBD placeholders until knockout stage data arrives.
+- **`rankGroupTeams(letter)`** — full FIFA tiebreaker. Step 1: H2H pts → H2H GD → H2H GF (recursive: re-runs `sortSub()` on any still-tied sub-group). Step 2 (overall): GD → GF → fair-play (`yellow + 3*red` from `teamCards`, lower = better) → FIFA ranking. Uses `allNormalized` for individual H2H match lookups.
+- **`FIFA_RANKINGS`** — constant object mapping team name → ranking number for all 48 qualified nations. Used as final tiebreaker (lower rank number = better).
+- **`THIRD_COMBOS`** — 495-entry constant object. Key: sorted 8-char string of the group letters whose 3rd-place teams advanced (e.g. `'ABCDEFGH'`). Value: 8-char slot string in match order `[M74,M77,M79,M80,M81,M82,M85,M87]` (e.g. `'CFHEBAGD'`). Covers every valid combination of 8-from-12 groups.
+- **`R32_MATCHES`** — 16-entry array. Each entry has `id`, `home` slot (e.g. `'1E'`), and either `away` slot or `mslot` (0–7 index into the 3rd-place slot assignment from `THIRD_COMBOS`).
+- **`getBest8ThirdPlace()`** — sorts all 12 3rd-place teams by pts → GD → GF → FIFA ranking, returns top 8 with their group letter.
+- **`getProjectedR32()`** — calls `getBest8ThirdPlace()`, builds the sorted 8-group key, looks up `THIRD_COMBOS`, returns a slot→team map for all 32 R32 participants.
+- **`buildProjMatchCard(homeTeam, awayTeam)`** — reuses `.match-card` CSS; shows flag + team name + fantasy owner. No scores shown.
+- **`renderProjBracketCols()`** — renders R32 column from projected standings + TBD columns for later rounds.
+- **Best 3rd Place Teams table** (bottom of Draft Order tab): shows all 12 3rd-place teams ranked, top 8 highlighted in gold with "ADV" badge, dividing line before 9th place. Rendered by `renderThirdPlaceTable()`, called from `renderOrder()`.
+- **`fetchGroupCards(normalized)`** — async, called in `syncNow()`. Fetches ESPN summary endpoint (`/summary?event={id}`) for all completed group-stage matches not already in `cardCache`. Parses `yellowCards` + `redCards` from `boxscore.teams[].statistics` and populates `teamCards` (module-level). Results persisted to `wcCards2026` localStorage key.
+- **Temporary banner**: shown above Projected tab content until 2026-06-28T09:00:00-04:00 (9am ET). Notes that bracket will update as group stage completes. Uses explicit timezone offset to avoid UTC-midnight parse bug.
 
 ### Bracket Tab (knockout-bracket branch)
 - Column-per-round layout: R32 → R16 → QF → SF → Final. 3rd place match appears below the Final column. Horizontally scrollable.
@@ -109,7 +126,8 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 Pulls from the ESPN scoreboard API (`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard`) every 90 seconds. No API key required; CORS is open (`*`). Previously used `worldcupjson.net` but that site only has 2022 data.
 
 - Fetches one request per date from June 11 through tomorrow in parallel (Promise.all), typically 2–40 requests depending on how far into the tournament we are
-- `normalizeEvent()` converts ESPN event shape to internal `{ stage, completed, home, away }` format
+- `normalizeEvent()` converts ESPN event shape to internal `{ id, stage, completed, home, away }` format. `id` is used by `fetchGroupCards()` to fetch summaries.
+- **Summary endpoint**: `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event={eventId}` — fetched by `fetchGroupCards()` for card data. Results cached in `cardCache` (persisted as `wcCards2026`).
 - ESPN uses `season.slug` for stage (e.g. `group-stage`); KO stage slugs unconfirmed until July 4 — matched with permissive regex in `KO_STAGES`
 - Shows sync status pill: Syncing / Live (with timestamp) / Error
 - Manual "Sync Now" button + "Pause Auto-sync" toggle
@@ -133,8 +151,10 @@ Team chips in the draft table include flag emojis (full lookup table for all 48 
 
 Chip styles by round: `chip-tbd`, `chip-out`, `chip-r32`, `chip-r16`, `chip-qf`, `chip-sf` (orange, semi-final in progress), `chip-4th`, `chip-3rd`, `chip-final` (silver with outline, runner-up), `chip-champ` (gold with dark outline + bold, champion).
 
-## localStorage Key
+## localStorage Keys
 
 `wcDraft2026` — stores `{ results, coinFlip }` objects keyed by team name / fantasy team ID. Names are no longer persisted (always read from `defaultName`).
 
 Each `results[team]` entry: `{ round, gf, ga, groupStats }` where `gf/ga` are total-tournament goals (used for fantasy scoring) and `groupStats` is `{ p, w, d, l, gf, ga }` for group-stage matches only (used for the standings display). `groupStats` is `null` until API data arrives.
+
+`wcCards2026` — card cache for fair-play tiebreaker. Object keyed by ESPN event ID; values are `{ teamName: { yellow, red } }`. Populated by `fetchGroupCards()` and read into `teamCards` on each sync.
