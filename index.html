@@ -1222,18 +1222,25 @@ function renderAlive() {
   const grid = document.getElementById('alive-grid');
   if (!grid) return;
   grid.innerHTML = '';
+
+  const projectedAlive = new Set();
+  try {
+    getProjectedR32().forEach(m => {
+      if (m.homeTeam) projectedAlive.add(m.homeTeam);
+      if (m.awayTeam) projectedAlive.add(m.awayTeam);
+    });
+  } catch(e) {}
+
   FANTASY_TEAMS.forEach(ft => {
-    const alive = ft.teams.filter(t => (state.results[t]?.round ?? -1) === -1);
+    const alive = ft.teams.filter(t => projectedAlive.has(t));
     const badgeCls = alive.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
     const rows = ft.teams.map(t => {
-      const round = state.results[t]?.round ?? -1;
-      const isIn = round === -1;
-      const [cc, cl] = ROUND_CHIP[String(round)] || ROUND_CHIP['-1'];
+      const isIn = projectedAlive.has(t);
       const flag = FLAGS[t] || '🏳';
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
         <span class="alive-team-name">${esc(t)}</span>
-        ${!isIn ? `<span class="chip ${cc} chip-sm">${cl}</span>` : ''}
+        ${!isIn ? `<span class="chip chip-out chip-sm">Group</span>` : ''}
       </div>`;
     }).join('');
     const card = document.createElement('div');
