@@ -133,6 +133,7 @@
     .chip-sf     { background: #fff3e0; color: #c05000; }
     .chip-final  { background: #d4d4d4; color: #222222; outline: 1px solid #999; outline-offset: -1px; }
     .chip-champ  { background: var(--gold); color: #111111; outline: 2px solid #333; outline-offset: -2px; font-weight: 800; }
+    .chip-clinch { background: #22c55e; color: #fff; }
 
     .stat-cell { text-align: center; font-size: 0.85rem; min-width: 4rem; }
     .stat-na { color: var(--muted); }
@@ -1218,6 +1219,21 @@ function renderThirdPlaceTable() {
 
 // ── Teams Still Alive ─────────────────────────────────────────────────────
 
+function hasClinched(team) {
+  const groupLetter = Object.entries(GROUPS).find(([, ts]) => ts.includes(team))?.[0];
+  if (!groupLetter) return false;
+  const ranked = rankGroupTeams(groupLetter);
+  const pos = ranked.indexOf(team);
+  if (pos >= 2) return false; // only check top-2 clinches
+  const myStats = state.results[team]?.groupStats;
+  if (!myStats || myStats.p === 0) return false;
+  const myPts = myStats.w * 3 + myStats.d;
+  const third = ranked[2];
+  const ts = state.results[third]?.groupStats || { w: 0, d: 0, p: 0 };
+  const thirdMax = (ts.w * 3 + ts.d) + (3 - ts.p) * 3;
+  return myPts > thirdMax;
+}
+
 function renderAlive() {
   const grid = document.getElementById('alive-grid');
   if (!grid) return;
@@ -1236,10 +1252,12 @@ function renderAlive() {
     const badgeCls = alive.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
     const rows = ft.teams.map(t => {
       const isIn = projectedAlive.has(t);
+      const clinched = isIn && hasClinched(t);
       const flag = FLAGS[t] || '🏳';
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
         <span class="alive-team-name">${esc(t)}</span>
+        ${clinched ? `<span class="chip chip-clinch chip-sm">✓</span>` : ''}
         ${!isIn ? `<span class="chip chip-out chip-sm">Group</span>` : ''}
       </div>`;
     }).join('');
