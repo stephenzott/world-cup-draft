@@ -1233,7 +1233,37 @@ function hasClinched(team) {
   const third = ranked[2];
   const ts = state.results[third]?.groupStats || { w: 0, d: 0, p: 0 };
   const thirdMax = (ts.w * 3 + ts.d) + (3 - ts.p) * 3;
-  return myPts > thirdMax;
+  if (myPts > thirdMax) return true;
+
+  // Extra check for 1st place: if ≤1 team below can reach my points I'm guaranteed top-2.
+  // Also handle the case where exactly 2 such teams haven't faced each other yet — they must
+  // meet in MD3, so only one can win; a draw can't give both ≥ myPts when myPts = 6.
+  if (pos === 0) {
+    const groupTeams = GROUPS[groupLetter];
+    const canReach = ranked.slice(1).filter(t => {
+      const s = state.results[t]?.groupStats || { w: 0, d: 0, p: 0 };
+      return (s.w * 3 + s.d) + (3 - s.p) * 3 >= myPts;
+    });
+    if (canReach.length <= 1) return true;
+    if (canReach.length === 2) {
+      const pairKey = canReach.slice().sort().join('|');
+      const played = allNormalized.some(m =>
+        m.stage === 'group-stage' &&
+        groupTeams.includes(m.home.name) && groupTeams.includes(m.away.name) &&
+        [m.home.name, m.away.name].sort().join('|') === pairKey
+      );
+      if (!played) {
+        // They meet in MD3; at most 1 can win. Only clinched if a draw can't give both ≥ myPts.
+        const p1 = (state.results[canReach[0]]?.groupStats?.w || 0) * 3 +
+                   (state.results[canReach[0]]?.groupStats?.d || 0);
+        const p2 = (state.results[canReach[1]]?.groupStats?.w || 0) * 3 +
+                   (state.results[canReach[1]]?.groupStats?.d || 0);
+        if (!(p1 + 1 >= myPts && p2 + 1 >= myPts)) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function renderAlive() {
