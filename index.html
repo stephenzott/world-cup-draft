@@ -1248,7 +1248,7 @@ function hasClinched(team) {
     if (canReach.length === 2) {
       const pairKey = canReach.slice().sort().join('|');
       const played = allNormalized.some(m =>
-        m.stage === 'group-stage' &&
+        m.stage === 'group-stage' && m.completed &&
         groupTeams.includes(m.home.name) && groupTeams.includes(m.away.name) &&
         [m.home.name, m.away.name].sort().join('|') === pairKey
       );
