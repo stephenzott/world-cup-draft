@@ -518,6 +518,33 @@
     .alive-team-row.team-in  { color: var(--text); font-weight: 500; }
     .alive-team-row.team-out { color: var(--muted); }
     .alive-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Head-to-Head Tab ── */
+    .h2h-note { font-size:0.75rem; color:var(--muted); margin-bottom:0.9rem; }
+    .h2h-grid-wrap { overflow-x:auto; padding-bottom:0.5rem; }
+    .h2h-grid { border-collapse:collapse; }
+    .h2h-grid .hg-colhead {
+      background:var(--border); color:#fff;
+      font-size:0.65rem; font-weight:700; text-align:center;
+      padding:0.38rem 0.3rem; border:1px solid #6070cc;
+      min-width:48px; white-space:nowrap;
+    }
+    .h2h-grid .hg-rowhead {
+      background:var(--surface2); font-weight:600;
+      text-align:right; padding:0.38rem 0.65rem;
+      border:1px solid #d4d9ff; font-size:0.75rem;
+      white-space:nowrap; min-width:90px;
+    }
+    .h2h-grid td {
+      border:1px solid #d4d9ff; text-align:center;
+      padding:0.3rem 0.3rem; font-size:0.72rem;
+      min-width:48px; white-space:nowrap;
+    }
+    .h2h-self { background:var(--surface2); color:#ccc; font-size:0.85rem; }
+    .h2h-win  { background:#e8f5ee; color:var(--green); font-weight:700; }
+    .h2h-loss { background:#fce8e8; color:var(--red); }
+    .h2h-draw { background:#fffbe6; color:#8a6500; }
+    .h2h-none { color:#ccc; font-size:0.85rem; }
   </style>
 </head>
 <body>
@@ -565,6 +592,7 @@
   <nav class="tabs-nav" id="tabs-nav">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
     <button class="tab-btn" onclick="showTab('projected')">Projected</button>
+    <button class="tab-btn" onclick="showTab('h2h')">Head-to-Head</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
   </nav>
 
@@ -640,6 +668,27 @@
       <h2>Projected Knockout Bracket</h2>
       <div class="bracket-wrap">
         <div class="bracket-cols" id="proj-bracket-cols"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── Tab: Head-to-Head ── -->
+  <div class="tab-panel" id="tab-h2h">
+
+    <section>
+      <h2>Fantasy League Table</h2>
+      <p class="h2h-note">Points earned when your World Cup teams face another manager's teams: 3 for a win, 1 for a draw. PK wins count as wins; goals are from regulation/AET only.</p>
+      <div style="overflow-x:auto">
+        <table class="draft-table" id="h2h-league"></table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Head-to-Head Grid</h2>
+      <p class="h2h-note">Row manager's W-D-L record against each column manager.</p>
+      <div class="h2h-grid-wrap">
+        <table class="h2h-grid" id="h2h-grid"></table>
       </div>
     </section>
 
@@ -1003,6 +1052,7 @@ function showTab(name) {
   });
   if (name === 'manual') renderGroups();
   if (name === 'projected') { renderProjectedBracket(); renderAlive(); }
+  if (name === 'h2h') renderH2H();
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -1650,6 +1700,123 @@ async function fetchGroupCards(normalized) {
   return result;
 }
 
+// ── Head-to-Head ──────────────────────────────────────────────────────────
+
+const H2H_SHORT = {
+  'Andrew/Tyler':'A/T',
+};
+
+function computeH2H() {
+  const ftMap = {};
+  FANTASY_TEAMS.forEach(ft => ft.teams.forEach(t => { ftMap[t] = ft.id; }));
+
+  const league = {};
+  FANTASY_TEAMS.forEach(ft => { league[ft.id] = { p:0, w:0, d:0, l:0, gf:0, ga:0 }; });
+
+  const grid = {};
+  FANTASY_TEAMS.forEach(a => {
+    grid[a.id] = {};
+    FANTASY_TEAMS.forEach(b => { if (a.id !== b.id) grid[a.id][b.id] = { w:0, d:0, l:0, gf:0, ga:0 }; });
+  });
+
+  for (const m of allNormalized) {
+    if (!m.completed) continue;
+    const hId = ftMap[m.home.name];
+    const aId = ftMap[m.away.name];
+    if (!hId || !aId || hId === aId) continue;
+
+    const hWon = m.home.winner;
+    const aWon = m.away.winner;
+    const isDraw = !hWon && !aWon;
+
+    league[hId].p++;  league[hId].gf += m.home.goals;  league[hId].ga += m.away.goals;
+    league[aId].p++;  league[aId].gf += m.away.goals;  league[aId].ga += m.home.goals;
+
+    if (hWon)        { league[hId].w++; league[aId].l++; }
+    else if (aWon)   { league[aId].w++; league[hId].l++; }
+    else             { league[hId].d++; league[aId].d++; }
+
+    grid[hId][aId].gf += m.home.goals;  grid[hId][aId].ga += m.away.goals;
+    grid[aId][hId].gf += m.away.goals;  grid[aId][hId].ga += m.home.goals;
+
+    if (hWon)        { grid[hId][aId].w++; grid[aId][hId].l++; }
+    else if (aWon)   { grid[aId][hId].w++; grid[hId][aId].l++; }
+    else             { grid[hId][aId].d++; grid[aId][hId].d++; }
+  }
+
+  return { league, grid };
+}
+
+function renderH2H() {
+  const leagueEl = document.getElementById('h2h-league');
+  const gridEl   = document.getElementById('h2h-grid');
+  if (!leagueEl || !gridEl) return;
+
+  const { league, grid } = computeH2H();
+
+  const sorted = FANTASY_TEAMS.map(ft => {
+    const s = league[ft.id];
+    return { ...ft, ...s, pts: s.w*3+s.d, gd: s.gf-s.ga };
+  }).sort((a, b) =>
+    b.pts !== a.pts ? b.pts - a.pts :
+    b.gd  !== a.gd  ? b.gd  - a.gd  :
+    b.gf  - a.gf
+  );
+
+  // League table
+  const leagueRows = sorted.map((r, i) => {
+    const noGames = r.p === 0;
+    const rankCls = i===0 ? 'rank-cell r1' : i===1 ? 'rank-cell r2' : i===2 ? 'rank-cell r3' : 'rank-cell';
+    const gdStr = r.gd > 0 ? '+'+r.gd : String(r.gd);
+    const gdCls = r.gd > 0 ? 'gd-pos' : r.gd < 0 ? 'gd-neg' : 'gd-zero';
+    return `<tr>
+      <td class="${rankCls}">${i+1}</td>
+      <td style="font-weight:600">${esc(r.defaultName)}</td>
+      <td class="stat-cell">${noGames ? '—' : r.p}</td>
+      <td class="stat-cell">${noGames ? '—' : r.w}</td>
+      <td class="stat-cell">${noGames ? '—' : r.d}</td>
+      <td class="stat-cell">${noGames ? '—' : r.l}</td>
+      <td class="stat-cell">${noGames ? '—' : r.gf}</td>
+      <td class="stat-cell">${noGames ? '—' : r.ga}</td>
+      <td class="stat-cell ${noGames ? 'stat-na' : gdCls}">${noGames ? '—' : gdStr}</td>
+      <td class="stat-cell" style="font-weight:800;font-size:0.95rem">${noGames ? '—' : r.pts}</td>
+    </tr>`;
+  }).join('');
+
+  leagueEl.innerHTML = `
+    <thead><tr>
+      <th style="text-align:center">#</th>
+      <th style="text-align:left">Manager</th>
+      <th style="text-align:center">P</th>
+      <th style="text-align:center">W</th>
+      <th style="text-align:center">D</th>
+      <th style="text-align:center">L</th>
+      <th style="text-align:center">GF</th>
+      <th style="text-align:center">GA</th>
+      <th style="text-align:center">GD</th>
+      <th style="text-align:center">Pts</th>
+    </tr></thead>
+    <tbody>${leagueRows}</tbody>`;
+
+  // Head-to-head grid
+  const colHeads = '<th></th>' + sorted.map(r =>
+    `<th class="hg-colhead">${esc(H2H_SHORT[r.defaultName] || r.defaultName)}</th>`
+  ).join('');
+
+  const gridRows = sorted.map(row => {
+    const cells = sorted.map(col => {
+      if (row.id === col.id) return `<td class="h2h-self">×</td>`;
+      const c = grid[row.id][col.id];
+      if (!c || c.w+c.d+c.l === 0) return `<td class="h2h-none">—</td>`;
+      const cls = c.w > c.l ? 'h2h-win' : c.l > c.w ? 'h2h-loss' : 'h2h-draw';
+      return `<td class="${cls}">${c.w}-${c.d}-${c.l}</td>`;
+    }).join('');
+    return `<tr><th class="hg-rowhead">${esc(row.defaultName)}</th>${cells}</tr>`;
+  }).join('');
+
+  gridEl.innerHTML = `<thead><tr>${colHeads}</tr></thead><tbody>${gridRows}</tbody>`;
+}
+
 // ── API Sync ───────────────────────────────────────────────────────────────
 
 const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
@@ -1842,6 +2009,7 @@ async function syncNow() {
       renderGroupsRO();
       if (document.getElementById('tab-manual').classList.contains('active')) renderGroups();
       if (document.getElementById('tab-projected')?.classList.contains('active')) renderProjectedBracket();
+      if (document.getElementById('tab-h2h')?.classList.contains('active')) renderH2H();
     }
 
     // Adaptive polling: 15s during live games, 90s otherwise
