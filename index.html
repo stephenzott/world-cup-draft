@@ -1316,11 +1316,39 @@ function hasClinched(team) {
   if (pos >= 2) return false; // only check top-2 clinches
   const myStats = state.results[team]?.groupStats;
   if (!myStats || myStats.p === 0) return false;
+
+  // If all group matches are complete, the ranking from rankGroupTeams is already final.
+  const groupTeamsAll = GROUPS[groupLetter];
+  if (groupTeamsAll.every(t => (state.results[t]?.groupStats?.p || 0) === 3)) return true;
+
   const myPts = myStats.w * 3 + myStats.d;
   const third = ranked[2];
   const ts = state.results[third]?.groupStats || { w: 0, d: 0, p: 0 };
   const thirdMax = (ts.w * 3 + ts.d) + (3 - ts.p) * 3;
   if (myPts > thirdMax) return true;
+
+  // Extra check for 2nd place: if 3rd can only tie (not exceed) our points and we beat them
+  // head-to-head, they can't overtake us via the H2H tiebreaker — so we've clinched top-2.
+  if (pos === 1 && thirdMax === myPts) {
+    const fourth = ranked[3];
+    const fs = state.results[fourth]?.groupStats || { w: 0, d: 0, p: 0 };
+    const fourthMax = (fs.w * 3 + fs.d) + (3 - fs.p) * 3;
+    if (fourthMax < myPts) {
+      // Only 3rd can possibly tie us. If we beat them H2H, we stay ahead on tiebreakers.
+      const groupTeams = GROUPS[groupLetter];
+      const h2h = allNormalized.find(m =>
+        m.stage === 'group-stage' && m.completed &&
+        groupTeams.includes(m.home.name) && groupTeams.includes(m.away.name) &&
+        ((m.home.name === team && m.away.name === third) ||
+         (m.home.name === third && m.away.name === team))
+      );
+      if (h2h) {
+        const weWon = (h2h.home.name === team && h2h.home.score > h2h.away.score) ||
+                      (h2h.away.name === team && h2h.away.score > h2h.home.score);
+        if (weWon) return true;
+      }
+    }
+  }
 
   // Extra check for 1st place: if ≤1 team below can reach my points I'm guaranteed top-2.
   // Also handle the case where exactly 2 such teams haven't faced each other yet — they must
