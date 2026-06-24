@@ -561,6 +561,8 @@
     .sc-p2 .sc-n { color:#166534; }
     .sc-p3 .sc-n { color:#1e40af; }
     .sc-p4 .sc-n { color:#991b1b; }
+    .sc-asterisk { font-size:0.6rem; color:var(--muted); vertical-align:super; margin-left:1px; }
+    .sc-footnote { padding:0.25rem 0.5rem 0.35rem; font-size:0.63rem; color:var(--muted); font-style:italic; border-top:1px solid #eee; }
   </style>
 </head>
 <body>
@@ -1357,21 +1359,54 @@ function isEliminated(team) {
   const myStats = state.results[team]?.groupStats;
   if (!myStats || myStats.p === 0) return false;
 
-  // All games played: use full tiebreaker ranking (catches H2H-based 4th place)
-  if (myStats.p === 3) {
-    return rankGroupTeams(groupLetter).indexOf(team) === 3;
-  }
-
-  // Games still remaining: only fire on hard raw-points elimination
-  const myPts = myStats.w * 3 + myStats.d;
-  const myMax = myPts + (3 - myStats.p) * 3;
   const groupTeams = GROUPS[groupLetter];
-  const teamsAhead = groupTeams.filter(t => {
-    if (t === team) return false;
-    const s = state.results[t]?.groupStats || { w: 0, d: 0, p: 0 };
-    return (s.w * 3 + s.d) > myMax;
+
+  // Find unplayed matches involving this team
+  const playedPairs = new Set(
+    allNormalized
+      .filter(m => m.stage === 'group-stage' && m.completed &&
+                   groupTeams.includes(m.home.name) && groupTeams.includes(m.away.name))
+      .map(m => [m.home.name, m.away.name].sort().join('|'))
+  );
+  const remainingOpps = groupTeams.filter(t =>
+    t !== team && !playedPairs.has([team, t].sort().join('|'))
+  );
+
+  // No remaining games: use full tiebreaker ranking directly
+  if (remainingOpps.length === 0) return rankGroupTeams(groupLetter).indexOf(team) === 3;
+
+  // Simulate best-case: team wins all remaining games, then check full tiebreakers
+  const origStats = {};
+  groupTeams.forEach(t => {
+    const gs = state.results[t]?.groupStats;
+    origStats[t] = gs ? { ...gs } : null;
   });
-  return teamsAhead.length >= 3;
+
+  const simMatches = remainingOpps.map(opp => ({
+    id: `__sim__${team}__${opp}`,
+    stage: 'group-stage',
+    completed: true,
+    home: { name: team, goals: 1 },
+    away: { name: opp, goals: 0 },
+  }));
+
+  remainingOpps.forEach(opp => {
+    const myGs = state.results[team]?.groupStats || { p:0, w:0, d:0, l:0, gf:0, ga:0 };
+    const oppGs = state.results[opp]?.groupStats  || { p:0, w:0, d:0, l:0, gf:0, ga:0 };
+    if (!state.results[team]) state.results[team] = { round:-1, gf:0, ga:0 };
+    if (!state.results[opp])  state.results[opp]  = { round:-1, gf:0, ga:0 };
+    state.results[team].groupStats = { ...myGs, p:myGs.p+1, w:myGs.w+1, gf:myGs.gf+1 };
+    state.results[opp].groupStats  = { ...oppGs, p:oppGs.p+1, l:(oppGs.l||0)+1, ga:oppGs.ga+1 };
+  });
+  allNormalized.push(...simMatches);
+
+  const rank = rankGroupTeams(groupLetter).indexOf(team);
+
+  // Restore
+  groupTeams.forEach(t => { if (state.results[t]) state.results[t].groupStats = origStats[t]; });
+  allNormalized = allNormalized.filter(m => !m.id?.startsWith('__sim__'));
+
+  return rank === 3;
 }
 
 // ── MD3 Scenarios ─────────────────────────────────────────────────────────
@@ -1406,31 +1441,40 @@ function getRemainingMatches(letter) {
 
 function simRankGroup(letter, m1, m2, o1, o2) {
   const teams = GROUPS[letter];
-  const stats = {};
+
+  // Save original groupStats
+  const origStats = {};
   teams.forEach(t => {
-    const gs = state.results[t]?.groupStats || { p: 0, w: 0, d: 0, gf: 0, ga: 0 };
-    stats[t] = { p: gs.p, w: gs.w || 0, d: gs.d || 0, gf: gs.gf || 0, ga: gs.ga || 0 };
+    const gs = state.results[t]?.groupStats;
+    origStats[t] = gs ? { ...gs } : null;
   });
-  const apply = (home, away, outcome) => {
-    const [hg, ag] = outcome === 'home' ? [1, 0] : outcome === 'draw' ? [0, 0] : [0, 1];
-    stats[home].p++; stats[away].p++;
-    stats[home].gf += hg; stats[home].ga += ag;
-    stats[away].gf += ag; stats[away].ga += hg;
-    if (hg > ag) stats[home].w++;
-    else if (hg < ag) stats[away].w++;
-    else { stats[home].d++; stats[away].d++; }
-  };
-  apply(m1.home, m1.away, o1);
-  apply(m2.home, m2.away, o2);
-  return [...teams].sort((a, b) => {
-    const sa = stats[a], sb = stats[b];
-    const ptsa = sa.w * 3 + sa.d, ptsb = sb.w * 3 + sb.d;
-    if (ptsa !== ptsb) return ptsb - ptsa;
-    const gda = sa.gf - sa.ga, gdb = sb.gf - sb.ga;
-    if (gda !== gdb) return gdb - gda;
-    if (sa.gf !== sb.gf) return sb.gf - sa.gf;
-    return (FIFA_RANKINGS[a] || 999) - (FIFA_RANKINGS[b] || 999);
+
+  // Build simulated match objects (1-0 win, 0-0 draw, 0-1 loss as placeholders)
+  const simEntries = [[m1, o1], [m2, o2]].map(([m, o]) => {
+    const [hg, ag] = o === 'home' ? [1, 0] : o === 'draw' ? [0, 0] : [0, 1];
+    return { id: `__scen__${m.home}__${m.away}`, stage: 'group-stage', completed: true,
+             home: { name: m.home, goals: hg }, away: { name: m.away, goals: ag } };
   });
+
+  // Patch groupStats
+  simEntries.forEach(({ home: h, away: a }) => {
+    const hg = h.goals, ag = a.goals;
+    const hGs = state.results[h.name]?.groupStats || { p:0, w:0, d:0, l:0, gf:0, ga:0 };
+    const aGs = state.results[a.name]?.groupStats || { p:0, w:0, d:0, l:0, gf:0, ga:0 };
+    if (!state.results[h.name]) state.results[h.name] = { round:-1, gf:0, ga:0 };
+    if (!state.results[a.name]) state.results[a.name] = { round:-1, gf:0, ga:0 };
+    state.results[h.name].groupStats = { ...hGs, p:hGs.p+1, w:hGs.w+(hg>ag?1:0), d:hGs.d+(hg===ag?1:0), gf:hGs.gf+hg, ga:hGs.ga+ag };
+    state.results[a.name].groupStats = { ...aGs, p:aGs.p+1, w:aGs.w+(ag>hg?1:0), d:aGs.d+(hg===ag?1:0), gf:aGs.gf+ag, ga:aGs.ga+hg };
+  });
+  allNormalized.push(...simEntries);
+
+  const ranked = rankGroupTeams(letter);
+
+  // Restore
+  teams.forEach(t => { if (state.results[t]) state.results[t].groupStats = origStats[t]; });
+  allNormalized = allNormalized.filter(m => !m.id?.startsWith('__scen__'));
+
+  return ranked;
 }
 
 function renderScenarios() {
@@ -1453,16 +1497,37 @@ function renderScenarios() {
 
     const colHeaders = OUTCOMES.map(o => `<th>${outcomeLabel(m2, o)}</th>`).join('');
 
+    let anyAsterisk = false;
+
     const rows = OUTCOMES.map(o1 => {
       const cells = OUTCOMES.map(o2 => {
         const ranked = simRankGroup(letter, m1, m2, o1, o2);
+        // Detect pts ties — order could flip with different actual margins
+        const pts = {};
+        GROUPS[letter].forEach(t => {
+          const gs = state.results[t]?.groupStats || { w:0, d:0 };
+          pts[t] = (gs.w || 0) * 3 + (gs.d || 0);
+        });
+        const addPts = (home, away, o) => {
+          if (o === 'home') pts[home] += 3;
+          else if (o === 'draw') { pts[home]++; pts[away]++; }
+          else pts[away] += 3;
+        };
+        addPts(m1.home, m1.away, o1);
+        addPts(m2.home, m2.away, o2);
+        const asterisk = ranked.some((t, i) => i < ranked.length - 1 && pts[t] === pts[ranked[i + 1]]);
+        if (asterisk) anyAsterisk = true;
         const entries = ranked.map((t, i) =>
           `<div class="sc-entry ${posClass[i]}"><span class="sc-n">${i + 1}.</span>${flag(t)} ${esc(t)}</div>`
         ).join('');
-        return `<td>${entries}</td>`;
+        return `<td>${entries}${asterisk ? '<span class="sc-asterisk">*</span>' : ''}</td>`;
       }).join('');
       return `<tr><td class="sc-rh">${outcomeLabel(m1, o1)}</td>${cells}</tr>`;
     }).join('');
+
+    const footnote = anyAsterisk
+      ? `<div class="sc-footnote">* Teams tied on points — order could change with different actual goal margins</div>`
+      : '';
 
     return `
       <div class="sc-card">
@@ -1477,6 +1542,7 @@ function renderScenarios() {
             <tbody>${rows}</tbody>
           </table>
         </div>
+        ${footnote}
       </div>`;
   }).filter(Boolean).join('');
 
