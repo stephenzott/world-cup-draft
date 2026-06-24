@@ -217,6 +217,7 @@
     .group-standings td.td-team { text-align: left; padding-left: 0.65rem; padding-right: 0.4rem; }
     .group-standings tr:last-child td { border-bottom: none; }
     .group-standings tr.tr-clinched td { background: #f0fdf4; }
+    .group-standings tr.tr-eliminated td { background: #fef2f2; }
     .group-standings .td-pts { font-weight: 800; color: var(--text); }
     .group-standings .td-gd-pos { color: var(--green); }
     .group-standings .td-gd-neg { color: var(--red); }
@@ -1181,8 +1182,9 @@ function renderGroupsRO() {
       const flag = FLAGS[team] || '🏳';
       const pts = gs ? gs.w * 3 + gs.d : null;
       const clinched = hasClinched(team);
+      const eliminated = !clinched && isEliminated(team);
       return `
-        <tr${clinched ? ' class="tr-clinched"' : ''}>
+        <tr${clinched ? ' class="tr-clinched"' : eliminated ? ' class="tr-eliminated"' : ''}>
           <td class="td-team">
             <div class="standings-team">${flag} ${esc(team)}</div>
             <div class="standings-owner">${esc(ownerName(team))}</div>
@@ -1314,6 +1316,22 @@ function hasClinched(team) {
   }
 
   return false;
+}
+
+function isEliminated(team) {
+  const groupLetter = Object.entries(GROUPS).find(([, ts]) => ts.includes(team))?.[0];
+  if (!groupLetter) return false;
+  const myStats = state.results[team]?.groupStats;
+  if (!myStats || myStats.p === 0) return false;
+  const myPts = myStats.w * 3 + myStats.d;
+  const myMax = myPts + (3 - myStats.p) * 3;
+  const groupTeams = GROUPS[groupLetter];
+  const teamsAhead = groupTeams.filter(t => {
+    if (t === team) return false;
+    const s = state.results[t]?.groupStats || { w: 0, d: 0, p: 0 };
+    return (s.w * 3 + s.d) > myMax;
+  });
+  return teamsAhead.length >= 3;
 }
 
 function renderAlive() {
