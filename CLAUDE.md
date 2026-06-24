@@ -54,7 +54,7 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 |--------|--------|-------|
 | `opta-predictions` | Parked, no PR | Adds public Odds tab with Opta pre-tournament predictions. Simulator idea shelved pending group interest — would need team strength ratings or per-match odds (stage probabilities we have are simulation outputs, not inputs). |
 
-Main tab nav is now always visible; Manual Entry is admin-only (`?admin`).
+Main tab nav is now always visible; Manual Entry and Scenarios are admin-only (`?admin`).
 
 ## TODO
 
@@ -67,6 +67,7 @@ Main tab nav is now always visible; Manual Entry is admin-only (`?admin`).
 - **Projected** — projected R32 bracket + Teams Still Alive grid. Public. On `main`.
 - **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public. On `opta-predictions` branch (parked).
 - **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only (`?admin`).
+- **Scenarios** — MD3 outcome matrix for groups with remaining matches. Admin-only (`?admin`).
 
 ### Header
 A **tournament stage pill** in the sync-bar reflects the current stage derived from the highest round in state: Group Stage → Round of 32 → Round of 16 → Quarter-Finals → Semi-Finals → Final → Complete. Updates every time `renderOrder()` runs.
@@ -86,8 +87,11 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - Read-only grid: 3 columns default → 2 (≤1100px) → 2 (≤768px) → 1 (≤480px)
 - Manual entry grid: 4 columns default → 3 (≤1100px) → 2 (≤768px) → 1 (≤480px)
 - Read-only view shows a FIFA-style standings table per group: **Team | Pts | GF | GA | chip**, sorted by Pts → GD → GF. Group-stage stats (W/D/L/GF/GA) are stored in `state.results[team].groupStats` — computed from API group-stage matches only (`stage === 'group-stage'`), separate from the total-tournament `gf/ga` used for fantasy scoring. If no API data, cells show `—`.
+- Rows are highlighted: light green (`tr-clinched`) for teams that have clinched top-2; light red (`tr-eliminated`) for teams mathematically eliminated. See `hasClinched()` and `isEliminated()` below.
 - Manual entry view adds round dropdown and goals for/against inputs
 - `renderGroups()` (manual entry form) is only rebuilt when switching to the Manual Entry tab or when an API sync fires while that tab is already active — avoids unnecessary DOM reconstruction
+- **`hasClinched(team)`** — returns true if the team has mathematically guaranteed a top-2 finish (using pts-based max-points check + a special case for 1st-place where exactly 2 chasers must meet in MD3). Only fires for teams in positions 0–1.
+- **`isEliminated(team)`** — returns true if the team is mathematically stuck in 4th place. Two cases: (1) if all 3 group games are played (`p === 3`), uses `rankGroupTeams()` with full tiebreakers (catches H2H-based 4th-place finishes); (2) if games remain, fires only when 3 other teams already have pts strictly greater than the team's maximum possible pts.
 
 ### Projected Tab
 - Shows a column-per-round bracket layout (R32 → R16 → QF → SF → Final). R32 is populated from projected group standings; later rounds show TBD placeholders until knockout stage data arrives.
@@ -103,6 +107,14 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - **Best 3rd Place Teams table** (bottom of Draft Order tab): shows all 12 3rd-place teams ranked, top 8 highlighted in gold with "ADV" badge, dividing line before 9th place. Rendered by `renderThirdPlaceTable()`, called from `renderOrder()`.
 - **`fetchGroupCards(normalized)`** — async, called in `syncNow()`. Fetches ESPN summary endpoint (`/summary?event={id}`) for all completed group-stage matches not already in `cardCache`. Parses `yellowCards` + `redCards` from `boxscore.teams[].statistics` and populates `teamCards` (module-level). Results persisted to `wcCards2026` localStorage key.
 - **Temporary banner**: shown above Projected tab content until 2026-06-28T09:00:00-04:00 (9am ET). Notes that bracket will update as group stage completes. Uses explicit timezone offset to avoid UTC-midnight parse bug.
+
+### Scenarios Tab (admin-only)
+- Shows a 3×3 outcome matrix for each group that still has remaining matches. Completed groups are omitted.
+- Rows = Match 1 outcomes (home win / draw / away win); Cols = Match 2 outcomes. Each cell shows the simulated final standings (1st–4th) for that combination.
+- Position colors: amber = 1st, green = 2nd, blue = 3rd, red = 4th.
+- **`getRemainingMatches(letter)`** — finds the 2 unplayed group-stage matches from `allNormalized` (preserving ESPN home/away). Falls back to deriving unplayed pairs from the set of completed matches if ESPN hasn't listed the upcoming fixtures yet.
+- **`simRankGroup(letter, m1, m2, o1, o2)`** — adds simulated match results on top of current `groupStats` and sorts by pts → GD → GF → FIFA ranking. H2H is not simulated (good enough for planning; actual results may differ in tied scenarios).
+- **`renderScenarios()`** — lazy, called on tab switch to 'scenarios'.
 
 ### Odds Tab (opta-predictions branch)
 - Sortable table: all 48 WC teams × 7 columns — Top Group, R32, R16, QF, SF, Final, 🏆 (champion). Data from Opta via The Analyst, hardcoded pre-tournament (June 2026).
