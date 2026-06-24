@@ -546,6 +546,21 @@
     .h2h-loss { background:#fce8e8; color:var(--red); }
     .h2h-draw { background:#fffbe6; color:#8a6500; }
     .h2h-none { color:#ccc; font-size:0.85rem; }
+    /* ── Scenarios Tab ── */
+    .scenarios-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1rem; padding:0.5rem 0 1rem; }
+    .sc-card { background:var(--surface); border:1px solid #ddd; border-radius:8px; overflow:hidden; }
+    .sc-card-hdr { background:var(--border); color:#fff; padding:0.45rem 0.75rem; font-weight:700; font-size:0.85rem; }
+    .sc-matches { padding:0.4rem 0.75rem; font-size:0.71rem; color:var(--muted); border-bottom:1px solid #eee; line-height:1.6; }
+    .sc-tbl { width:100%; border-collapse:collapse; font-size:0.69rem; }
+    .sc-tbl th, .sc-tbl td { border:1px solid #e5e7eb; padding:0.28rem 0.3rem; }
+    .sc-tbl th { background:#f9fafb; font-size:0.65rem; font-weight:700; text-align:center; }
+    .sc-tbl .sc-rh { background:#f9fafb; font-weight:700; font-size:0.65rem; text-align:center; white-space:nowrap; }
+    .sc-entry { display:flex; align-items:center; gap:0.15rem; padding:1px 0; white-space:nowrap; }
+    .sc-n { font-weight:800; min-width:0.85rem; font-size:0.63rem; }
+    .sc-p1 .sc-n { color:#92400e; }
+    .sc-p2 .sc-n { color:#166534; }
+    .sc-p3 .sc-n { color:#1e40af; }
+    .sc-p4 .sc-n { color:#991b1b; }
   </style>
 </head>
 <body>
@@ -595,6 +610,7 @@
     <button class="tab-btn" onclick="showTab('projected')">Projected</button>
     <button class="tab-btn" onclick="showTab('h2h')">Head-to-Head</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
+    <button class="tab-btn" id="scenarios-tab-btn" onclick="showTab('scenarios')" style="display:none">Scenarios</button>
   </nav>
 
   <!-- ── Tab: Draft Order ── -->
@@ -714,6 +730,22 @@
       <div id="coin-flip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.5rem;"></div>
     </section>
 
+  </div>
+
+  <!-- ── Tab: Scenarios ── -->
+  <div class="tab-panel" id="tab-scenarios">
+    <section>
+      <h2>MD3 Scenarios</h2>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;">
+        Final standings under each match-day 3 outcome combination. Rows = Match 1 result, Cols = Match 2 result.
+        Rankings use Pts → GD → GF → FIFA ranking (H2H not simulated).
+        <span style="color:#92400e;font-weight:700;">1st</span> ·
+        <span style="color:#166534;font-weight:700;">2nd</span> ·
+        <span style="color:#1e40af;font-weight:700;">3rd</span> ·
+        <span style="color:#991b1b;font-weight:700;">4th</span>
+      </p>
+      <div class="scenarios-grid" id="scenarios-content"></div>
+    </section>
   </div>
 
 </div>
@@ -1054,6 +1086,7 @@ function showTab(name) {
   if (name === 'manual') renderGroups();
   if (name === 'projected') { renderProjectedBracket(); renderAlive(); }
   if (name === 'h2h') renderH2H();
+  if (name === 'scenarios') renderScenarios();
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
@@ -1323,6 +1356,13 @@ function isEliminated(team) {
   if (!groupLetter) return false;
   const myStats = state.results[team]?.groupStats;
   if (!myStats || myStats.p === 0) return false;
+
+  // All games played: use full tiebreaker ranking (catches H2H-based 4th place)
+  if (myStats.p === 3) {
+    return rankGroupTeams(groupLetter).indexOf(team) === 3;
+  }
+
+  // Games still remaining: only fire on hard raw-points elimination
   const myPts = myStats.w * 3 + myStats.d;
   const myMax = myPts + (3 - myStats.p) * 3;
   const groupTeams = GROUPS[groupLetter];
@@ -1332,6 +1372,115 @@ function isEliminated(team) {
     return (s.w * 3 + s.d) > myMax;
   });
   return teamsAhead.length >= 3;
+}
+
+// ── MD3 Scenarios ─────────────────────────────────────────────────────────
+
+function getRemainingMatches(letter) {
+  const teams = GROUPS[letter];
+  // Prefer ESPN-scheduled upcoming matches (preserves home/away)
+  const upcoming = allNormalized.filter(m =>
+    m.stage === 'group-stage' && !m.completed &&
+    teams.includes(m.home.name) && teams.includes(m.away.name)
+  ).map(m => ({ home: m.home.name, away: m.away.name }));
+  if (upcoming.length >= 2) return upcoming.slice(0, 2);
+
+  // Fallback: derive from pairs not yet played
+  const played = new Set(
+    allNormalized
+      .filter(m => m.stage === 'group-stage' && m.completed &&
+                   teams.includes(m.home.name) && teams.includes(m.away.name))
+      .map(m => [m.home.name, m.away.name].sort().join('|'))
+  );
+  const remaining = [];
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
+      const pair = [teams[i], teams[j]].sort().join('|');
+      if (!played.has(pair) && !upcoming.some(u => [u.home, u.away].sort().join('|') === pair)) {
+        remaining.push({ home: teams[i], away: teams[j] });
+      }
+    }
+  }
+  return [...upcoming, ...remaining].slice(0, 2);
+}
+
+function simRankGroup(letter, m1, m2, o1, o2) {
+  const teams = GROUPS[letter];
+  const stats = {};
+  teams.forEach(t => {
+    const gs = state.results[t]?.groupStats || { p: 0, w: 0, d: 0, gf: 0, ga: 0 };
+    stats[t] = { p: gs.p, w: gs.w || 0, d: gs.d || 0, gf: gs.gf || 0, ga: gs.ga || 0 };
+  });
+  const apply = (home, away, outcome) => {
+    const [hg, ag] = outcome === 'home' ? [1, 0] : outcome === 'draw' ? [0, 0] : [0, 1];
+    stats[home].p++; stats[away].p++;
+    stats[home].gf += hg; stats[home].ga += ag;
+    stats[away].gf += ag; stats[away].ga += hg;
+    if (hg > ag) stats[home].w++;
+    else if (hg < ag) stats[away].w++;
+    else { stats[home].d++; stats[away].d++; }
+  };
+  apply(m1.home, m1.away, o1);
+  apply(m2.home, m2.away, o2);
+  return [...teams].sort((a, b) => {
+    const sa = stats[a], sb = stats[b];
+    const ptsa = sa.w * 3 + sa.d, ptsb = sb.w * 3 + sb.d;
+    if (ptsa !== ptsb) return ptsb - ptsa;
+    const gda = sa.gf - sa.ga, gdb = sb.gf - sb.ga;
+    if (gda !== gdb) return gdb - gda;
+    if (sa.gf !== sb.gf) return sb.gf - sa.gf;
+    return (FIFA_RANKINGS[a] || 999) - (FIFA_RANKINGS[b] || 999);
+  });
+}
+
+function renderScenarios() {
+  const el = document.getElementById('scenarios-content');
+  if (!el) return;
+
+  const OUTCOMES = ['home', 'draw', 'away'];
+  const posClass = ['sc-p1', 'sc-p2', 'sc-p3', 'sc-p4'];
+
+  const cards = Object.keys(GROUPS).map(letter => {
+    const matches = getRemainingMatches(letter);
+    if (matches.length < 2) return '';
+    const [m1, m2] = matches;
+    const flag = t => FLAGS[t] || '🏳';
+
+    const outcomeLabel = (m, o) =>
+      o === 'home' ? `${flag(m.home)} ${esc(m.home)} W`
+      : o === 'away' ? `${flag(m.away)} ${esc(m.away)} W`
+      : 'Draw';
+
+    const colHeaders = OUTCOMES.map(o => `<th>${outcomeLabel(m2, o)}</th>`).join('');
+
+    const rows = OUTCOMES.map(o1 => {
+      const cells = OUTCOMES.map(o2 => {
+        const ranked = simRankGroup(letter, m1, m2, o1, o2);
+        const entries = ranked.map((t, i) =>
+          `<div class="sc-entry ${posClass[i]}"><span class="sc-n">${i + 1}.</span>${flag(t)} ${esc(t)}</div>`
+        ).join('');
+        return `<td>${entries}</td>`;
+      }).join('');
+      return `<tr><td class="sc-rh">${outcomeLabel(m1, o1)}</td>${cells}</tr>`;
+    }).join('');
+
+    return `
+      <div class="sc-card">
+        <div class="sc-card-hdr">Group ${letter}</div>
+        <div class="sc-matches">
+          M1: ${flag(m1.home)} ${esc(m1.home)} vs ${flag(m1.away)} ${esc(m1.away)}<br>
+          M2: ${flag(m2.home)} ${esc(m2.home)} vs ${flag(m2.away)} ${esc(m2.away)}
+        </div>
+        <div style="overflow-x:auto">
+          <table class="sc-tbl">
+            <thead><tr><th>M1 \\ M2</th>${colHeaders}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).filter(Boolean).join('');
+
+  el.innerHTML = cards || '<p style="color:var(--muted)">No pending matches — all groups complete.</p>';
 }
 
 function renderAlive() {
@@ -2242,6 +2391,7 @@ if (new Date() >= new Date('2026-06-11')) {
 
 if (new URLSearchParams(location.search).has('admin')) {
   document.getElementById('manual-tab-btn').style.display = '';
+  document.getElementById('scenarios-tab-btn').style.display = '';
 }
 </script>
 
