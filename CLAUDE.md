@@ -91,7 +91,7 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - Manual entry view adds round dropdown and goals for/against inputs
 - `renderGroups()` (manual entry form) is only rebuilt when switching to the Manual Entry tab or when an API sync fires while that tab is already active — avoids unnecessary DOM reconstruction
 - **`hasClinched(team)`** — returns true if the team has mathematically guaranteed a top-2 finish (using pts-based max-points check + a special case for 1st-place where exactly 2 chasers must meet in MD3). Only fires for teams in positions 0–1.
-- **`isEliminated(team)`** — returns true if the team is mathematically stuck in 4th place. Two cases: (1) if all 3 group games are played (`p === 3`), uses `rankGroupTeams()` with full tiebreakers (catches H2H-based 4th-place finishes); (2) if games remain, fires only when 3 other teams already have pts strictly greater than the team's maximum possible pts.
+- **`isEliminated(team)`** — returns true if the team is mathematically stuck in 4th place even in their best-case scenario (winning all remaining games). Uses a patch-and-restore approach: temporarily writes simulated wins into `state.results[t].groupStats` and injects fake completed matches into `allNormalized` (prefixed `__sim__`), then calls `rankGroupTeams()` for full H2H-aware ranking, then restores everything. If no remaining games, calls `rankGroupTeams()` directly. This catches H2H-based eliminations before MD3 is played (e.g. a team that beat the target team head-to-head).
 
 ### Projected Tab
 - Shows a column-per-round bracket layout (R32 → R16 → QF → SF → Final). R32 is populated from projected group standings; later rounds show TBD placeholders until knockout stage data arrives.
@@ -113,7 +113,8 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - Rows = Match 1 outcomes (home win / draw / away win); Cols = Match 2 outcomes. Each cell shows the simulated final standings (1st–4th) for that combination.
 - Position colors: amber = 1st, green = 2nd, blue = 3rd, red = 4th.
 - **`getRemainingMatches(letter)`** — finds the 2 unplayed group-stage matches from `allNormalized` (preserving ESPN home/away). Falls back to deriving unplayed pairs from the set of completed matches if ESPN hasn't listed the upcoming fixtures yet.
-- **`simRankGroup(letter, m1, m2, o1, o2)`** — adds simulated match results on top of current `groupStats` and sorts by pts → GD → GF → FIFA ranking. H2H is not simulated (good enough for planning; actual results may differ in tied scenarios).
+- **`simRankGroup(letter, m1, m2, o1, o2)`** — uses the same patch-and-restore pattern as `isEliminated`: injects simulated match results (1-0 win, 0-0 draw, 0-1 loss as placeholder scores) into `state.results[t].groupStats` and `allNormalized` (prefixed `__scen__`), calls `rankGroupTeams()` for full H2H-aware ranking, then restores. Placeholder scores mean GD/GF tiebreakers reflect a 1-goal margin; actual large-margin results could shift those.
+- Cells where two adjacent teams end up tied on points show a `*` superscript; a footnote appears at the bottom of the card explaining that actual goal margins could change the order.
 - **`renderScenarios()`** — lazy, called on tab switch to 'scenarios'.
 
 ### Odds Tab (opta-predictions branch)
