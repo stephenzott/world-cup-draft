@@ -454,6 +454,16 @@
       background: var(--surface2); border: 1px dashed #ccc; border-radius: 5px;
       padding: 0.9rem 0.5rem; text-align: center; color: var(--muted); font-size: 0.7rem;
     }
+    .match-score { font-size: 0.8rem; font-weight: 700; margin-left: auto; padding-left: 0.35rem; flex-shrink: 0; }
+    .mt-winner { background: #f0f4ff; }
+    .mt-winner .match-name { font-weight: 800; }
+    .match-live-bar {
+      font-size: 0.6rem; font-weight: 700; color: #cc0000; background: #fff5f5;
+      padding: 0.12rem 0.45rem; display: flex; align-items: center; gap: 0.3rem;
+      border-bottom: 1px solid #ffd0d0; letter-spacing: 0.04em;
+    }
+    .live-dot { width: 6px; height: 6px; background: #cc0000; border-radius: 50%; display: inline-block; animation: kdot 1s ease-in-out infinite; }
+    @keyframes kdot { 0%,100% { opacity:1 } 50% { opacity:0.25 } }
     .third-place-sep {
       margin-top: 0.75rem; padding-top: 0.35rem; border-top: 1px dashed #ccc;
       text-align: center; font-size: 0.65rem; color: var(--muted);
@@ -609,7 +619,7 @@
 
   <nav class="tabs-nav" id="tabs-nav">
     <button class="tab-btn active" onclick="showTab('order')">Draft Order</button>
-    <button class="tab-btn" onclick="showTab('projected')">Projected</button>
+    <button class="tab-btn" onclick="showTab('projected')">Bracket</button>
     <button class="tab-btn" onclick="showTab('h2h')">Head-to-Head</button>
     <button class="tab-btn" id="manual-tab-btn" onclick="showTab('manual')" style="display:none">Manual Entry</button>
     <button class="tab-btn" id="scenarios-tab-btn" onclick="showTab('scenarios')" style="display:none">Scenarios</button>
@@ -676,15 +686,13 @@
   <!-- ── Tab: Projected ── -->
   <div class="tab-panel" id="tab-projected">
 
-    <div class="proj-banner" id="proj-banner">BASED ON CURRENT STANDINGS &mdash; NOT FINAL</div>
-
     <section>
       <h2>Teams Still Alive</h2>
       <div class="alive-grid" id="alive-grid"></div>
     </section>
 
     <section>
-      <h2>Projected Knockout Bracket</h2>
+      <h2>Knockout Bracket</h2>
       <div class="bracket-wrap">
         <div class="bracket-cols" id="proj-bracket-cols"></div>
       </div>
@@ -1582,34 +1590,56 @@ function renderAlive() {
   if (!grid) return;
   grid.innerHTML = '';
 
-  const projectedAlive = new Set();
-  try {
-    getProjectedR32().forEach(m => {
-      if (m.homeTeam) projectedAlive.add(m.homeTeam);
-      if (m.awayTeam) projectedAlive.add(m.awayTeam);
-    });
-  } catch(e) {}
+  // Determine which teams have entered the knockout bracket
+  const koMatches = allNormalized.filter(m => m.stage !== 'group-stage');
+  const inKnockouts = new Set();
+  koMatches.forEach(m => { inKnockouts.add(m.home.name); inKnockouts.add(m.away.name); });
+
+  // Fall back to projected R32 when KO hasn't started yet
+  if (inKnockouts.size === 0) {
+    try {
+      getProjectedR32().forEach(m => {
+        if (m.homeTeam) inKnockouts.add(m.homeTeam);
+        if (m.awayTeam) inKnockouts.add(m.awayTeam);
+      });
+    } catch(e) {}
+  }
 
   FANTASY_TEAMS.forEach(ft => {
-    const alive = ft.teams.filter(t => projectedAlive.has(t));
-    const badgeCls = alive.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
+    // "Still alive" = in the bracket AND not yet given a KO loss round (1=R32, 2=R16, 3=QF)
+    const aliveTeams = ft.teams.filter(t => {
+      if (!inKnockouts.has(t)) return false;
+      const r = state.results[t]?.round ?? -1;
+      return r !== 1 && r !== 2 && r !== 3;
+    });
+
+    const badgeCls = aliveTeams.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
     const rows = ft.teams.map(t => {
-      const isIn = projectedAlive.has(t);
-      const clinched = isIn && hasClinched(t);
+      const isIn = aliveTeams.includes(t);
+      const r    = state.results[t]?.round ?? -1;
       const flag = FLAGS[t] || '🏳';
+      let chip = '';
+      if (!isIn) {
+        if (inKnockouts.has(t) && r >= 1) {
+          const [cc, cl] = ROUND_CHIP[String(r)] || ROUND_CHIP['-1'];
+          chip = `<span class="chip ${cc} chip-sm">${cl}</span>`;
+        } else {
+          chip = `<span class="chip chip-out chip-sm">Group</span>`;
+        }
+      }
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
         <span class="alive-team-name">${esc(t)}</span>
-        ${clinched ? `<span class="chip chip-clinch chip-sm">✓</span>` : ''}
-        ${!isIn ? `<span class="chip chip-out chip-sm">Group</span>` : ''}
+        ${chip}
       </div>`;
     }).join('');
+
     const card = document.createElement('div');
     card.className = 'alive-card';
     card.innerHTML = `
       <div class="alive-card-header">
         <span class="alive-owner-name">${esc(ft.defaultName)}</span>
-        <span class="alive-badge ${badgeCls}">${alive.length}/4</span>
+        <span class="alive-badge ${badgeCls}">${aliveTeams.length}/4</span>
       </div>${rows}`;
     grid.appendChild(card);
   });
@@ -1825,23 +1855,56 @@ function getProjectedR32() {
   }));
 }
 
-function buildProjMatchCard(homeTeam, awayTeam) {
-  function row(team) {
+function findKOMatch(teamA, teamB) {
+  if (!teamA || !teamB) return null;
+  return allNormalized.find(m =>
+    m.stage !== 'group-stage' &&
+    ((m.home.name === teamA && m.away.name === teamB) ||
+     (m.home.name === teamB && m.away.name === teamA))
+  ) || null;
+}
+
+function makeSlot(homeTeam, awayTeam) {
+  const m = findKOMatch(homeTeam, awayTeam);
+  let winner = null;
+  if (m && m.completed) {
+    const hIsHome = m.home.name === homeTeam;
+    winner = (hIsHome ? m.home.winner : m.away.winner) ? homeTeam : awayTeam;
+  }
+  return { homeTeam, awayTeam, liveMatch: m, winner };
+}
+
+function buildMatchCard(homeTeam, awayTeam) {
+  const m = findKOMatch(homeTeam, awayTeam);
+  const showScore = m && (m.completed || m.state === 'in');
+  const flipped   = m && homeTeam && m.home.name !== homeTeam;
+  const hGoals = showScore ? (flipped ? m.away.goals : m.home.goals) : null;
+  const aGoals = showScore ? (flipped ? m.home.goals : m.away.goals) : null;
+  const hWon   = m?.completed && (flipped ? m.away.winner : m.home.winner);
+  const aWon   = m?.completed && (flipped ? m.home.winner : m.away.winner);
+
+  function row(team, goals, won) {
     if (!team) return `<div class="match-team-row mt-tbd">
       <span class="match-flag"></span>
       <div class="match-info"><span class="match-name">TBD</span></div>
     </div>`;
     const flag  = FLAGS[team] || '🏳';
     const owner = ownerName(team);
-    return `<div class="match-team-row">
+    return `<div class="match-team-row${won ? ' mt-winner' : ''}">
       <span class="match-flag">${flag}</span>
       <div class="match-info">
         <span class="match-name">${esc(team)}</span>
         ${owner !== '?' ? `<span class="match-owner">${esc(owner)}</span>` : ''}
       </div>
+      ${showScore ? `<span class="match-score">${goals}</span>` : ''}
     </div>`;
   }
-  return `<div class="match-card">${row(homeTeam)}${row(awayTeam)}</div>`;
+
+  const liveBar = m && m.state === 'in'
+    ? `<div class="match-live-bar"><span class="live-dot"></span>${m.clock || 'Live'}</div>`
+    : '';
+
+  return `<div class="match-card">${liveBar}${row(homeTeam, hGoals, hWon)}${row(awayTeam, aGoals, aWon)}</div>`;
 }
 
 function renderProjBracketCols() {
@@ -1858,44 +1921,58 @@ function renderProjBracketCols() {
 
   // Pairs of R32_MATCHES indices that feed the same R16 match, in bracket order
   const R32_PAIRS = [
-    [1, 4],   // M74, M77 → R16 M89
-    [0, 2],   // M73, M75 → R16 M90
-    [10, 11], // M83, M84 → R16 M93
-    [8, 9],   // M81, M82 → R16 M94
-    [3, 5],   // M76, M78 → R16 M91
-    [6, 7],   // M79, M80 → R16 M92
-    [13, 15], // M86, M88 → R16 M95
-    [12, 14], // M85, M87 → R16 M96
+    [1, 4], [0, 2], [10, 11], [8, 9], [3, 5], [6, 7], [13, 15], [12, 14],
   ];
 
-  const tbd  = () => buildProjMatchCard(null, null);
+  // Build slot data for each round
+  const r32Slots = R32_PAIRS.map(([a, b]) => [
+    makeSlot(r32all[a].homeTeam, r32all[a].awayTeam),
+    makeSlot(r32all[b].homeTeam, r32all[b].awayTeam),
+  ]);
+
+  // R16: winners of each R32 pair face each other
+  const r16Slots = r32Slots.map(([s0, s1]) => makeSlot(s0.winner, s1.winner));
+
+  // QF: pairs of R16 winners
+  const r16Pairs = [[0,1],[2,3],[4,5],[6,7]];
+  const qfSlots  = r16Pairs.map(([a, b]) => makeSlot(r16Slots[a].winner, r16Slots[b].winner));
+
+  // SF: pairs of QF winners
+  const sfSlots = [[0,1],[2,3]].map(([a, b]) => makeSlot(qfSlots[a].winner, qfSlots[b].winner));
+
+  // Final + 3rd place
+  const finalSlot = makeSlot(sfSlots[0].winner, sfSlots[1].winner);
+  function loser(s) {
+    if (!s.liveMatch?.completed || !s.winner) return null;
+    return s.winner === s.homeTeam ? s.awayTeam : s.homeTeam;
+  }
+  const thirdSlot = makeSlot(loser(sfSlots[0]), loser(sfSlots[1]));
+
   const slot = card  => `<div class="bs">${card}</div>`;
   const pair = cards => `<div class="bpair">${cards.map(slot).join('')}</div>`;
+  const mc   = s     => buildMatchCard(s.homeTeam, s.awayTeam);
 
   // R32
   const r32Col = document.createElement('div');
   r32Col.className = 'bracket-col col-r32';
   r32Col.innerHTML = `<div class="bracket-col-header">R32</div><div class="bracket-col-body">${
-    R32_PAIRS.map(([a, b]) => pair([
-      buildProjMatchCard(r32all[a].homeTeam, r32all[a].awayTeam),
-      buildProjMatchCard(r32all[b].homeTeam, r32all[b].awayTeam),
-    ])).join('')
+    r32Slots.map(([s0, s1]) => pair([mc(s0), mc(s1)])).join('')
   }</div>`;
   container.appendChild(r32Col);
 
-  // R16 (4 pairs)
+  // R16 (4 pairs of 2)
   const r16Col = document.createElement('div');
   r16Col.className = 'bracket-col col-r16';
   r16Col.innerHTML = `<div class="bracket-col-header">R16</div><div class="bracket-col-body">${
-    [0,1,2,3].map(() => pair([tbd(), tbd()])).join('')
+    [[0,1],[2,3],[4,5],[6,7]].map(([a,b]) => pair([mc(r16Slots[a]), mc(r16Slots[b])])).join('')
   }</div>`;
   container.appendChild(r16Col);
 
-  // QF (2 pairs)
+  // QF (2 pairs of 2)
   const qfCol = document.createElement('div');
   qfCol.className = 'bracket-col col-qf';
   qfCol.innerHTML = `<div class="bracket-col-header">QF</div><div class="bracket-col-body">${
-    [0,1].map(() => pair([tbd(), tbd()])).join('')
+    [[0,1],[2,3]].map(([a,b]) => pair([mc(qfSlots[a]), mc(qfSlots[b])])).join('')
   }</div>`;
   container.appendChild(qfCol);
 
@@ -1903,22 +1980,20 @@ function renderProjBracketCols() {
   const sfCol = document.createElement('div');
   sfCol.className = 'bracket-col col-sf';
   sfCol.innerHTML = `<div class="bracket-col-header">SF</div><div class="bracket-col-body">${
-    pair([tbd(), tbd()])
+    pair([mc(sfSlots[0]), mc(sfSlots[1])])
   }</div>`;
   container.appendChild(sfCol);
 
-  // Final (1 card) + 3rd place
+  // Final + 3rd place
   const finalCol = document.createElement('div');
   finalCol.className = 'bracket-col col-final';
   finalCol.innerHTML = `<div class="bracket-col-header">Final</div><div class="bracket-col-body">${
-    slot(tbd())
-  }<div class="third-place-sep">3rd Place</div>${tbd()}</div>`;
+    slot(mc(finalSlot))
+  }<div class="third-place-sep">3rd Place</div>${mc(thirdSlot)}</div>`;
   container.appendChild(finalCol);
 }
 
 function renderProjectedBracket() {
-  const banner = document.getElementById('proj-banner');
-  if (banner) banner.style.display = new Date() < new Date('2026-06-28T09:00:00-04:00') ? '' : 'none';
   renderProjBracketCols();
 }
 
