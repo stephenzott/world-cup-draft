@@ -1642,16 +1642,14 @@ function renderAlive() {
     const badgeCls = aliveTeams.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
     const rows = ft.teams.map(t => {
       const isIn = aliveTeams.includes(t);
-      const r    = state.results[t]?.round ?? -1;
+      const dr   = displayRound(t);
       const flag = FLAGS[t] || '🏳';
       let chip = '';
-      if (!isIn) {
-        if (inKnockouts.has(t) && r >= 1) {
-          const [cc, cl] = ROUND_CHIP[String(r)] || ROUND_CHIP['-1'];
-          chip = `<span class="chip ${cc} chip-sm">${cl}</span>`;
-        } else {
-          chip = `<span class="chip chip-out chip-sm">Group</span>`;
-        }
+      if (inKnockouts.has(t)) {
+        const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
+        chip = `<span class="chip ${cc} chip-sm">${cl}</span>`;
+      } else {
+        chip = `<span class="chip chip-out chip-sm">Group</span>`;
       }
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
