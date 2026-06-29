@@ -1103,12 +1103,14 @@ function showTab(name) {
 
 function calcScore(ft, resultsOverride) {
   const res = resultsOverride || state.results;
-  const rs = ft.teams.map(t => res[t] || { round: -1, gf: 0, ga: 0 });
-  const played = rs.filter(r => r.round >= 0);
+  // When overriding (rank-movement baseline), use stored rounds directly.
+  // Otherwise use displayRound so alive teams reflect their current round.
+  const rounds = ft.teams.map(t => resultsOverride ? (res[t]?.round ?? -1) : displayRound(t));
+  const played = rounds.filter(r => r >= 0);
   return {
-    maxRound:    played.length ? Math.max(...played.map(r => r.round)) : -1,
-    totalRounds: played.reduce((s, r) => s + r.round, 0),
-    totalGD:     rs.reduce((s, r) => s + (r.gf || 0) - (r.ga || 0), 0),
+    maxRound:    played.length ? Math.max(...played) : -1,
+    totalRounds: played.reduce((s, r) => s + r, 0),
+    totalGD:     ft.teams.reduce((s, t) => { const r = res[t]; return s + (r?.gf || 0) - (r?.ga || 0); }, 0),
   };
 }
 
