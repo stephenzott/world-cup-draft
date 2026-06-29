@@ -90,7 +90,8 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - **`isEliminated(team)`** — returns true if the team is mathematically stuck in 4th place even in their best-case scenario (winning all remaining games). Uses a patch-and-restore approach: temporarily writes simulated wins into `state.results[t].groupStats` and injects fake completed matches into `allNormalized` (prefixed `__sim__`), then calls `rankGroupTeams()` for full H2H-aware ranking, then restores everything. If no remaining games, calls `rankGroupTeams()` directly. This catches H2H-based eliminations before MD3 is played (e.g. a team that beat the target team head-to-head).
 
 ### Draft Order Table
-- **`displayRound(team)`** — returns the round to display for a team, reflecting the furthest round *reached* rather than the exit round. Teams still alive in the bracket show the round they're currently in (e.g. won R32 → displays R16). Maps KO win count to display round: 1 win → 2 (R16), 2 → 3 (QF), 3 → 3.5 (SF), 4 → 6 (Final). Falls back to `state.results[team].round` for eliminated teams and definitive terminal results (≥5). Used for chips in the draft table, "Best Result" column, and owner card modal. Scoring sort (`maxRound`) is unchanged — still uses exit-based stored round.
+- **`displayRound(team)`** — returns the furthest round a team has *reached* (not their exit round). Teams still alive show the round they're currently in (e.g. won R32 → returns 2 = R16). Maps KO win count: 1 win → 2 (R16), 2 → 3 (QF), 3 → 3.5 (SF), 4 → 6 (Final). Falls back to `state.results[team].round` for eliminated teams and definitive terminal results (≥5). Used for all chip display (draft table, "Best Result" column, owner card modal, alive grid) **and also drives `calcScore`** so draft order ranks alive teams correctly during the tournament.
+- **`calcScore(ft, resultsOverride?)`** — computes `{ maxRound, totalRounds, totalGD }`. Without override (normal render): uses `displayRound` per team so alive teams rank by current round. With `resultsOverride` (live rank-movement baseline): uses raw stored rounds from the override to keep baseline self-consistent.
 
 ### Bracket Tab
 - Shows a live column-per-round bracket layout (R32 → R16 → QF → SF → Final) populated from actual ESPN KO match data, falling back to projected group standings for unplayed slots.
@@ -153,7 +154,9 @@ Color palette (CSS custom properties):
 
 Team chips in the draft table include flag emojis (full lookup table for all 48 qualified nations).
 
-Chip styles by round: `chip-tbd`, `chip-out`, `chip-r32`, `chip-r16`, `chip-qf`, `chip-sf` (orange, semi-final in progress), `chip-4th`, `chip-3rd`, `chip-final` (silver with outline, runner-up), `chip-champ` (gold with dark outline + bold, champion).
+Chip styles by round: `chip-tbd`, `chip-out` (label: "Round" on draft order, "Group" in alive grid), `chip-r32`, `chip-r16`, `chip-qf`, `chip-sf` (orange, semi-final in progress), `chip-4th`, `chip-3rd`, `chip-final` (silver with outline, runner-up), `chip-champ` (gold with dark outline + bold, champion).
+
+Schedule stage labels: group stage matches show "Group Stage"; KO matches show "Round of 32", "Round of 16", "Quarter-Final", "Semi-Final", "3rd Place", or "Final" — mapped from ESPN's `season.slug` via regex in `renderSchedule()`.
 
 ## localStorage Keys
 
