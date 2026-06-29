@@ -1162,9 +1162,14 @@ function displayRound(team) {
 // who haven't won a match yet. Keeps scoring (calcScore) unaffected.
 function chipRound(team) {
   const dr = displayRound(team);
-  if (dr === 0 && allNormalized.some(m =>
-    m.stage !== 'group-stage' && (m.home.name === team || m.away.name === team)
-  )) return 1;
+  if (dr === 0) {
+    try {
+      const inBracket =
+        allNormalized.some(m => m.stage !== 'group-stage' && (m.home.name === team || m.away.name === team)) ||
+        getProjectedR32().some(m => m.homeTeam === team || m.awayTeam === team);
+      if (inBracket) return 1;
+    } catch(e) {}
+  }
   return dr;
 }
 
