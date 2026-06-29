@@ -1131,6 +1131,31 @@ function ownerName(team) {
   return ft ? ft.defaultName : '?';
 }
 
+// Returns the round to display for a team — reflects furthest round reached,
+// so a team still alive in R16 shows 2 (R16) rather than 0 (group exit).
+function displayRound(team) {
+  const r = state.results[team]?.round ?? -1;
+  // Definitive terminal results (3rd/runner-up/champ/4th after 3rd-place game) are already set
+  if (r >= 5) return r;
+  // Count completed KO wins
+  const koWins = allNormalized.filter(m =>
+    m.stage !== 'group-stage' && m.completed &&
+    ((m.home.name === team && m.home.winner) || (m.away.name === team && m.away.winner))
+  ).length;
+  if (koWins === 0) return r;
+  // If they also have a KO loss, the stored exit round is already correct
+  const hasKOLoss = allNormalized.some(m =>
+    m.stage !== 'group-stage' && m.completed &&
+    ((m.home.name === team && m.away.winner) || (m.away.name === team && m.home.winner))
+  );
+  if (hasKOLoss) return r;
+  // Still alive — map win count to the round they are currently in
+  if (koWins === 1) return 2;   // won R32, now in R16
+  if (koWins === 2) return 3;   // won R16, now in QF
+  if (koWins === 3) return 3.5; // won QF, now in SF
+  return 6;                      // won SF, now in Final
+}
+
 function currentStage() {
   const max = Math.max(...Object.values(state.results).map(r => r.round));
   if (max < 1)   return 'Group Stage';
@@ -1157,7 +1182,8 @@ function renderOrder() {
   const hasMovements = Object.keys(rankMovements).length > 0;
   order.forEach((ft, i) => {
     const s = ft.score;
-    const [chipCls, chipLbl] = ROUND_CHIP[String(s.maxRound)] || ROUND_CHIP['-1'];
+    const maxDispR = Math.max(...ft.teams.map(displayRound));
+    const [chipCls, chipLbl] = ROUND_CHIP[String(maxDispR)] || ROUND_CHIP['-1'];
     const gdVal = s.maxRound >= 0 ? (s.totalGD > 0 ? '+' + s.totalGD : String(s.totalGD)) : null;
     const gdCls = s.totalGD > 0 ? 'gd-pos' : s.totalGD < 0 ? 'gd-neg' : 'gd-zero';
     const rankCls = i === 0 ? 'rank-cell r1' : i === 1 ? 'rank-cell r2' : i === 2 ? 'rank-cell r3' : 'rank-cell';
@@ -1173,8 +1199,8 @@ function renderOrder() {
     }
 
     const chips = ft.teams.map(t => {
-      const r = state.results[t] || { round: -1 };
-      const [cc, cl] = ROUND_CHIP[String(r.round)] || ROUND_CHIP['-1'];
+      const dr = displayRound(t);
+      const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
       const flag = FLAGS[t] || '🏳';
       return `<span class="chip ${cc}" title="${t}">${flag} ${cl}</span>`;
     }).join('');
@@ -2468,13 +2494,15 @@ function showOwnerCard(ftId) {
   const order = sortOrder();
   const rank  = order.findIndex(f => f.id === ftId) + 1;
   const s     = order.find(f => f.id === ftId)?.score || {};
-  const [chipCls, chipLbl] = ROUND_CHIP[String(s.maxRound)] || ROUND_CHIP['-1'];
+  const maxDispR  = Math.max(...ft.teams.map(displayRound));
+  const [chipCls, chipLbl] = ROUND_CHIP[String(maxDispR)] || ROUND_CHIP['-1'];
   const gdStr = s.maxRound >= 0 ? (s.totalGD > 0 ? `+${s.totalGD}` : String(s.totalGD)) : '—';
 
   let teamsHtml = '';
   for (const team of ft.teams) {
     const res  = state.results[team] || { round: -1, gf: 0, ga: 0, groupStats: null };
-    const [cc, cl] = ROUND_CHIP[String(res.round)] || ROUND_CHIP['-1'];
+    const dr   = displayRound(team);
+    const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
     const flag = FLAGS[team] || '🏳';
 
     let grpLetter = '';
@@ -2503,7 +2531,7 @@ function showOwnerCard(ftId) {
       const matchDay = schedFmtDate(upcoming.date);
       const matchTime = new Date(upcoming.utcDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       nextHtml = `<div class="oc-team-next">Next: vs ${oppFlag} ${esc(opp)} &middot; ${matchDay}, ${matchTime}</div>`;
-    } else if (res.round > 0 || (res.round === 0 && allNormalized.some(m => m.stage !== 'group-stage'))) {
+    } else if (res.round > 0 || (res.round === 0 && dr === 0 && allNormalized.some(m => m.stage !== 'group-stage'))) {
       nextHtml = `<div class="oc-team-next oc-eliminated">Eliminated</div>`;
     }
 
