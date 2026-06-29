@@ -632,7 +632,7 @@
       <h2>Draft Order</h2>
       <div class="legend">
         <span class="legend-item"><span class="chip chip-tbd">—</span> Not started</span>
-        <span class="legend-item"><span class="chip chip-out">Group</span> Group exit</span>
+        <span class="legend-item"><span class="chip chip-out">Round</span> Group exit</span>
         <span class="legend-item"><span class="chip chip-r32">R32</span></span>
         <span class="legend-item"><span class="chip chip-r16">R16</span></span>
         <span class="legend-item"><span class="chip chip-qf">QF</span></span>
@@ -857,7 +857,7 @@ const FLAGS = {
 
 const ROUND_CHIP = {
   '-1': ['chip-tbd',   '—'],
-  '0':  ['chip-out',   'Group'],
+  '0':  ['chip-out',   'Round'],
   '1':  ['chip-r32',   'R32'],
   '2':  ['chip-r16',   'R16'],
   '3':  ['chip-qf',    'QF'],
@@ -1651,7 +1651,7 @@ function renderAlive() {
         const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
         chip = `<span class="chip ${cc} chip-sm">${cl}</span>`;
       } else {
-        chip = `<span class="chip chip-out chip-sm">Group</span>`;
+        chip = `<span class="chip chip-out chip-sm">Round</span>`;
       }
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
