@@ -1158,6 +1158,16 @@ function displayRound(team) {
   return 6;                      // won SF, now in Final
 }
 
+// Display-only wrapper: upgrades round 0 → 1 (R32) for teams in the KO bracket
+// who haven't won a match yet. Keeps scoring (calcScore) unaffected.
+function chipRound(team) {
+  const dr = displayRound(team);
+  if (dr === 0 && allNormalized.some(m =>
+    m.stage !== 'group-stage' && (m.home.name === team || m.away.name === team)
+  )) return 1;
+  return dr;
+}
+
 function currentStage() {
   const max = Math.max(...Object.values(state.results).map(r => r.round));
   if (max < 1)   return 'Group Stage';
@@ -1201,7 +1211,7 @@ function renderOrder() {
     }
 
     const chips = ft.teams.map(t => {
-      const dr = displayRound(t);
+      const dr = chipRound(t);
       const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
       const flag = FLAGS[t] || '🏳';
       return `<span class="chip ${cc}" title="${t}">${flag} ${cl}</span>`;
@@ -1644,7 +1654,7 @@ function renderAlive() {
     const badgeCls = aliveTeams.length > 0 ? 'alive-badge-in' : 'alive-badge-out';
     const rows = ft.teams.map(t => {
       const isIn = aliveTeams.includes(t);
-      const dr   = displayRound(t);
+      const dr   = chipRound(t);
       const flag = FLAGS[t] || '🏳';
       let chip = '';
       if (inKnockouts.has(t)) {
@@ -2506,7 +2516,7 @@ function showOwnerCard(ftId) {
   let teamsHtml = '';
   for (const team of ft.teams) {
     const res  = state.results[team] || { round: -1, gf: 0, ga: 0, groupStats: null };
-    const dr   = displayRound(team);
+    const dr   = chipRound(team);
     const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
     const flag = FLAGS[team] || '🏳';
 
