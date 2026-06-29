@@ -1651,7 +1651,7 @@ function renderAlive() {
         const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
         chip = `<span class="chip ${cc} chip-sm">${cl}</span>`;
       } else {
-        chip = `<span class="chip chip-out chip-sm">Round</span>`;
+        chip = `<span class="chip chip-out chip-sm">Group</span>`;
       }
       return `<div class="alive-team-row ${isIn ? 'team-in' : 'team-out'}">
         <span>${flag}</span>
@@ -2445,11 +2445,16 @@ function renderSchedule() {
     const homeFlag  = FLAGS[m.home.name] || '';
     const awayFlag  = FLAGS[m.away.name] || '';
 
-    let stageLabel = '';
-    for (const [g, teams] of Object.entries(GROUPS)) {
-      if (teams.includes(m.home.name)) { stageLabel = `Group ${g}`; break; }
+    let stageLabel = 'Group Stage';
+    if (m.stage !== 'group-stage') {
+      if      (/round.of.32/i.test(m.stage))                        stageLabel = 'Round of 32';
+      else if (/round.of.16/i.test(m.stage))                        stageLabel = 'Round of 16';
+      else if (/quarter/i.test(m.stage))                            stageLabel = 'Quarter-Final';
+      else if (/semi/i.test(m.stage))                               stageLabel = 'Semi-Final';
+      else if (/third|3rd/i.test(m.stage))                          stageLabel = '3rd Place';
+      else if (/final/i.test(m.stage) && !/semi|third/i.test(m.stage)) stageLabel = 'Final';
+      else stageLabel = m.stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
-    if (!stageLabel) stageLabel = m.stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
     const localTime = new Date(m.utcDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
