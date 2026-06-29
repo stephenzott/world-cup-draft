@@ -1199,7 +1199,7 @@ function renderOrder() {
   const hasMovements = Object.keys(rankMovements).length > 0;
   order.forEach((ft, i) => {
     const s = ft.score;
-    const maxDispR = Math.max(...ft.teams.map(displayRound));
+    const maxDispR = Math.max(...ft.teams.map(chipRound));
     const [chipCls, chipLbl] = ROUND_CHIP[String(maxDispR)] || ROUND_CHIP['-1'];
     const gdVal = s.maxRound >= 0 ? (s.totalGD > 0 ? '+' + s.totalGD : String(s.totalGD)) : null;
     const gdCls = s.totalGD > 0 ? 'gd-pos' : s.totalGD < 0 ? 'gd-neg' : 'gd-zero';
@@ -2514,7 +2514,7 @@ function showOwnerCard(ftId) {
   const order = sortOrder();
   const rank  = order.findIndex(f => f.id === ftId) + 1;
   const s     = order.find(f => f.id === ftId)?.score || {};
-  const maxDispR  = Math.max(...ft.teams.map(displayRound));
+  const maxDispR  = Math.max(...ft.teams.map(chipRound));
   const [chipCls, chipLbl] = ROUND_CHIP[String(maxDispR)] || ROUND_CHIP['-1'];
   const gdStr = s.maxRound >= 0 ? (s.totalGD > 0 ? `+${s.totalGD}` : String(s.totalGD)) : '—';
 
