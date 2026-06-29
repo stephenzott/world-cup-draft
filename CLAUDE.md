@@ -56,15 +56,11 @@ Team names are hardcoded as `defaultName` in `FANTASY_TEAMS` — not editable by
 
 Main tab nav is now always visible; Manual Entry and Scenarios are admin-only (`?admin`).
 
-## TODO
-
-- **Extend bracket to full R16/QF/SF/Final**: The Projected tab currently only populates the R32 column from group standings. The R16, QF, SF, Final columns show static "TBD" placeholders. Once the knockout stage begins (≈2026-07-04), wire actual match results into those columns so the bracket tracks real progress. The `knockout-bracket` branch has `bracketMatches` + `renderBracketCols()` that pulls live KO data from the ESPN scoreboard — merging that branch (scheduled 2026-06-28) will be the foundation; the Projected tab should then consume those results for the later rounds.
-
 ## UI
 
 ### Tabs
 - **Draft Order** — ranked table + read-only groups grid + Best 3rd Place Teams table. Public.
-- **Projected** — projected R32 bracket + Teams Still Alive grid. Public. On `main`.
+- **Bracket** — live knockout bracket (R32→R16→QF→SF→Final) + Teams Still Alive grid. Public. On `main`.
 - **Odds** — sortable table of all 48 teams × 7 stage probabilities from Opta. Public. On `opta-predictions` branch (parked).
 - **Manual Entry** — editable groups grid (round + goals for/against) + coin flip seeds. Admin-only (`?admin`).
 - **Scenarios** — MD3 outcome matrix for groups with remaining matches. Admin-only (`?admin`).
@@ -93,20 +89,25 @@ Ties are not flagged visually on the public page; coin flip asterisks appear onl
 - **`hasClinched(team)`** — returns true if the team has mathematically guaranteed a top-2 finish (using pts-based max-points check + a special case for 1st-place where exactly 2 chasers must meet in MD3). Only fires for teams in positions 0–1.
 - **`isEliminated(team)`** — returns true if the team is mathematically stuck in 4th place even in their best-case scenario (winning all remaining games). Uses a patch-and-restore approach: temporarily writes simulated wins into `state.results[t].groupStats` and injects fake completed matches into `allNormalized` (prefixed `__sim__`), then calls `rankGroupTeams()` for full H2H-aware ranking, then restores everything. If no remaining games, calls `rankGroupTeams()` directly. This catches H2H-based eliminations before MD3 is played (e.g. a team that beat the target team head-to-head).
 
-### Projected Tab
-- Shows a column-per-round bracket layout (R32 → R16 → QF → SF → Final). R32 is populated from projected group standings; later rounds show TBD placeholders until knockout stage data arrives.
+### Draft Order Table
+- **`displayRound(team)`** — returns the round to display for a team, reflecting the furthest round *reached* rather than the exit round. Teams still alive in the bracket show the round they're currently in (e.g. won R32 → displays R16). Maps KO win count to display round: 1 win → 2 (R16), 2 → 3 (QF), 3 → 3.5 (SF), 4 → 6 (Final). Falls back to `state.results[team].round` for eliminated teams and definitive terminal results (≥5). Used for chips in the draft table, "Best Result" column, and owner card modal. Scoring sort (`maxRound`) is unchanged — still uses exit-based stored round.
+
+### Bracket Tab
+- Shows a live column-per-round bracket layout (R32 → R16 → QF → SF → Final) populated from actual ESPN KO match data, falling back to projected group standings for unplayed slots.
+- **`findKOMatch(teamA, teamB)`** — finds a non-group-stage match between two teams in `allNormalized`, handling flipped home/away orientation.
+- **`makeSlot(homeTeam, awayTeam)`** — resolves a bracket slot: calls `findKOMatch`, sets `winner` if the match is completed. Returns `{ homeTeam, awayTeam, liveMatch, winner }`.
+- **`buildMatchCard(homeTeam, awayTeam)`** — renders a `.match-card` with flag, team name, fantasy owner. Shows scores only when `completed || state === 'in'` (avoids 0-0 display for scheduled matches). Highlights winner row with `.mt-winner`. Shows pulsing live bar during in-progress games.
+- **`renderProjBracketCols()`** — builds bracket from `getProjectedR32()` → `makeSlot` chains through R32→R16→QF→SF→Final. R16 slots come from R32 pair winners; QF from R16 pair winners; SF from QF pair winners; Final and 3rd place from SF winners/losers.
+- **`R32_PAIRS`** — defined inside `renderProjBracketCols()`. 8 entries, each a pair of indices into `r32all` (from `getProjectedR32()`) whose winners meet in the same R16 match, in visual bracket order.
+- **`renderAlive()`** — renders the Teams Still Alive grid (12 owner cards). Uses actual KO match participants from `allNormalized` when available; falls back to projected R32 during group stage. "Alive" = in the bracket AND `state.results[team].round` not in {1, 2, 3}. Each team row shows a `displayRound` chip regardless of alive status — alive teams show current round (e.g. "R16"), eliminated teams show exit round. Called from `renderGroupsRO()` (via `renderOrder()`) and on tab switch to Bracket.
 - **`rankGroupTeams(letter)`** — full FIFA tiebreaker. Step 1: H2H pts → H2H GD → H2H GF (recursive: re-runs `sortSub()` on any still-tied sub-group). Step 2 (overall): GD → GF → fair-play (`yellow + 3*red` from `teamCards`, lower = better) → FIFA ranking. Uses `allNormalized` for individual H2H match lookups.
 - **`FIFA_RANKINGS`** — constant object mapping team name → ranking number for all 48 qualified nations. Used as final tiebreaker (lower rank number = better).
 - **`THIRD_COMBOS`** — 495-entry constant object. Key: sorted 8-char string of the group letters whose 3rd-place teams advanced (e.g. `'ABCDEFGH'`). Value: 8-char slot string in match order `[M74,M77,M79,M80,M81,M82,M85,M87]` (e.g. `'CFHEBAGD'`). Covers every valid combination of 8-from-12 groups.
 - **`R32_MATCHES`** — 16-entry array. Each entry has `id`, `home` slot (e.g. `'1E'`), and either `away` slot or `mslot` (0–7 index into the 3rd-place slot assignment from `THIRD_COMBOS`).
 - **`getBest8ThirdPlace()`** — sorts all 12 3rd-place teams by pts → GD → GF → FIFA ranking, returns top 8 with their group letter.
 - **`getProjectedR32()`** — calls `getBest8ThirdPlace()`, builds the sorted 8-group key, looks up `THIRD_COMBOS`, returns a slot→team map for all 32 R32 participants.
-- **`buildProjMatchCard(homeTeam, awayTeam)`** — reuses `.match-card` CSS; shows flag + team name + fantasy owner. No scores shown.
-- **`renderProjBracketCols()`** — renders R32 column from projected standings + TBD columns for later rounds.
-- **`renderAlive()`** — renders the Teams Still Alive grid (12 owner cards). Each card shows owner name, `X/4` alive badge (purple when >0, gray when 0), and all 4 teams with eliminated ones dimmed + round chip. Called from `renderOrder()` and on tab switch to Projected.
 - **Best 3rd Place Teams table** (bottom of Draft Order tab): shows all 12 3rd-place teams ranked, top 8 highlighted in gold with "ADV" badge, dividing line before 9th place. Rendered by `renderThirdPlaceTable()`, called from `renderOrder()`.
 - **`fetchGroupCards(normalized)`** — async, called in `syncNow()`. Fetches ESPN summary endpoint (`/summary?event={id}`) for all completed group-stage matches not already in `cardCache`. Parses `yellowCards` + `redCards` from `boxscore.teams[].statistics` and populates `teamCards` (module-level). Results persisted to `wcCards2026` localStorage key.
-- **Temporary banner**: shown above Projected tab content until 2026-06-28T09:00:00-04:00 (9am ET). Notes that bracket will update as group stage completes. Uses explicit timezone offset to avoid UTC-midnight parse bug.
 
 ### Scenarios Tab (admin-only)
 - Shows a 3×3 outcome matrix for each group that still has remaining matches. Completed groups are omitted.
