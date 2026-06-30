@@ -1219,7 +1219,9 @@ function renderOrder() {
       const dr = chipRound(t);
       const [cc, cl] = ROUND_CHIP[String(dr)] || ROUND_CHIP['-1'];
       const flag = FLAGS[t] || '🏳';
-      return `<span class="chip ${cc}" title="${t}">${flag} ${cl}</span>`;
+      const r = state.results[t]?.round ?? -1;
+      const isElim = dr === 0 || r === 1 || r === 2 || r === 3 || r === 4;
+      return `<span class="chip ${isElim ? 'chip-out' : cc}" title="${t}">${flag} ${cl}</span>`;
     }).join('');
 
     let arrowHtml = '';
