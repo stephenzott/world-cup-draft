@@ -2537,7 +2537,8 @@ function showOwnerCard(ftId) {
     if (gs) {
       const pts = gs.w * 3 + gs.d;
       const gd  = gs.gf - gs.ga;
-      statsHtml = `<div class="oc-team-stats">Group ${grpLetter} &middot; ${gs.p} GP &middot; ${pts} pts &middot; ${gs.gf}–${gs.ga} (${gd >= 0 ? '+' : ''}${gd})</div>`;
+      const totalGP = allNormalized.filter(m => m.completed && !m.id.startsWith('__') && (m.home.name === team || m.away.name === team)).length;
+      statsHtml = `<div class="oc-team-stats">Group ${grpLetter} &middot; ${totalGP} GP &middot; ${pts} pts &middot; ${gs.gf}–${gs.ga} (${gd >= 0 ? '+' : ''}${gd})</div>`;
     } else {
       statsHtml = `<div class="oc-team-stats">Group ${grpLetter}</div>`;
     }
