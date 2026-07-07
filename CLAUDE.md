@@ -77,7 +77,7 @@ Responsive column hiding:
 
 Team names are plain text (not editable).
 
-Ties are not flagged visually on the public page; coin flip asterisks appear only in the admin coin flip settings.
+Coin-flip ties are flagged on the public page with a `🎲 coin flip` gold badge next to the fantasy team name. All teams in the same coin-flip tie group get the badge. Admin coin flip settings still show asterisks separately.
 
 ### Groups Grid
 - Read-only grid: 3 columns default → 2 (≤1100px) → 2 (≤768px) → 1 (≤480px)

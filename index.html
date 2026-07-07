@@ -108,10 +108,27 @@
     .r2 { color: var(--border); }
     .r3 { color: var(--red); }
 
+    .ft-name {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
     .ft-name span {
       color: var(--text);
       font-weight: 600;
       font-size: 0.88rem;
+    }
+
+    .coin-flip-tag {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #7a5a00;
+      background: var(--gold);
+      border-radius: 3px;
+      padding: 0.1rem 0.35rem;
+      white-space: nowrap;
     }
 
     .wc-chips { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; }
@@ -1197,6 +1214,18 @@ function renderOrder() {
   tbody.innerHTML = '';
 
   const hasMovements = Object.keys(rankMovements).length > 0;
+
+  const coinFlipTiedIds = new Set();
+  order.forEach((ft, i) => {
+    const isTiedWith = (other) =>
+      ft.score.maxRound    === other.score.maxRound &&
+      ft.score.totalRounds === other.score.totalRounds &&
+      ft.score.totalGD     === other.score.totalGD;
+    if ((i > 0 && isTiedWith(order[i - 1])) || (i < order.length - 1 && isTiedWith(order[i + 1]))) {
+      coinFlipTiedIds.add(ft.id);
+    }
+  });
+
   order.forEach((ft, i) => {
     const s = ft.score;
     const maxDispR = Math.max(...ft.teams.map(chipRound));
@@ -1205,15 +1234,9 @@ function renderOrder() {
     const gdCls = s.totalGD > 0 ? 'gd-pos' : s.totalGD < 0 ? 'gd-neg' : 'gd-zero';
     const rankCls = i === 0 ? 'rank-cell r1' : i === 1 ? 'rank-cell r2' : i === 2 ? 'rank-cell r3' : 'rank-cell';
 
-    let tiedTag = '';
-    if (i > 0) {
-      const prev = order[i - 1];
-      if (s.maxRound === prev.score.maxRound &&
-          s.totalRounds === prev.score.totalRounds &&
-          s.totalGD === prev.score.totalGD) {
-        tiedTag = '';
-      }
-    }
+    const tiedTag = coinFlipTiedIds.has(ft.id)
+      ? '<span class="coin-flip-tag">🎲 coin flip</span>'
+      : '';
 
     const chips = ft.teams.map(t => {
       const dr = chipRound(t);
