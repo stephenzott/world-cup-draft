@@ -1154,12 +1154,22 @@ function displayRound(team) {
     ((m.home.name === team && m.home.winner) || (m.away.name === team && m.away.winner))
   ).length;
   if (koWins === 0) return r;
-  // If they also have a KO loss, the stored exit round is already correct
+  // If they also have a KO loss, the stored exit round is already correct —
+  // except SF losers (r=4, koWins=3) where round 4 is premature until the 3rd-place game is played.
   const hasKOLoss = allNormalized.some(m =>
     m.stage !== 'group-stage' && m.completed &&
     ((m.home.name === team && m.away.winner) || (m.away.name === team && m.home.winner))
   );
-  if (hasKOLoss) return r;
+  if (hasKOLoss) {
+    if (r === 4 && koWins === 3) {
+      const thirdPlayed = allNormalized.some(m =>
+        /third|3rd/i.test(m.stage) && m.completed &&
+        (m.home.name === team || m.away.name === team)
+      );
+      if (!thirdPlayed) return 3.5;
+    }
+    return r;
+  }
   // Still alive — map win count to the round they are currently in
   if (koWins === 1) return 2;   // won R32, now in R16
   if (koWins === 2) return 3;   // won R16, now in QF
@@ -1184,6 +1194,10 @@ function chipRound(team) {
 
 function currentStage() {
   const max = Math.max(...Object.values(state.results).map(r => r.round));
+  // Don't show Complete unless a Final match is actually completed in API data
+  if (max >= 7 && !allNormalized.some(m =>
+    /final/i.test(m.stage) && !/semi|third|quarter/i.test(m.stage) && m.completed
+  )) return 'Final';
   if (max < 1)   return 'Group Stage';
   if (max < 2)   return 'Round of 32';
   if (max < 3)   return 'Round of 16';
@@ -2236,7 +2250,7 @@ function normName(n) { return API_NAME_MAP[n] || n; }
 
 // slug matching is permissive — KO stage slugs aren't confirmed until July 4
 const KO_STAGES = [
-  { test: s => /final/i.test(s) && !/semi|third/i.test(s), win: 7,    loss: 6 },
+  { test: s => /final/i.test(s) && !/semi|third|quarter/i.test(s), win: 7,    loss: 6 },
   { test: s => /third|3rd/i.test(s),                        win: 5,    loss: 4 },
   { test: s => /semi/i.test(s),                             win: null, loss: 4 },
   { test: s => /quarter/i.test(s),                          win: null, loss: 3 },
