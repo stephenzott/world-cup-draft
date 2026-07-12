@@ -25,7 +25,9 @@ Ranking (worst → best, i.e. earliest draft pick = worst result):
 3. **Total Goal Difference** — net GF–GA across all played matches
 4. **Coin Flip seed** — tiebreaker of last resort (lower number drafts earlier)
 
-Round values: Group exit = 0, R32 = 1, R16 = 2, QF = 3, Semi-Final (in progress) = 3.5, 4th place = 4, 3rd place = 5, Runner-Up = 6, Champion = 7.
+Scoring round values: Group exit = 0, R32 = 1, R16 = 2, QF = 3, Semi-Final (3rd or 4th — no distinction) = 4, Final (runner-up or champion — no distinction) = 5.
+
+Stored round values (set by API/manual entry): same 0–3, plus 3.5 = SF in progress (manual), 4 = 4th place, 5 = 3rd place, 6 = Runner-Up, 7 = Champion. `scoreRound()` maps stored → scoring: 3.5/4/5 → 4, 6/7 → 5.
 
 Round 3.5 is a manual-entry-only intermediate state for teams currently in the semi-finals. The API will overwrite it with the correct resolved value (4/5/6/7) once the match completes. Withdrawn/forfeited matches award a 3-0 win to the non-withdrawing side — the API should reflect this in goals and no special handling is needed.
 

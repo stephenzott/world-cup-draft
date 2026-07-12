@@ -1110,11 +1110,21 @@ function showTab(name) {
 
 // ── Scoring ────────────────────────────────────────────────────────────────
 
+// All semifinalists score 4 (3rd/4th indistinguishable); all finalists score 5 (runner-up/champion indistinguishable).
+function scoreRound(r) {
+  if (r >= 6)   return 5; // finalist
+  if (r >= 3.5) return 4; // semifinalist
+  return r;
+}
+
 function calcScore(ft, resultsOverride) {
   const res = resultsOverride || state.results;
   // When overriding (rank-movement baseline), use stored rounds directly.
   // Otherwise use displayRound so alive teams reflect their current round.
-  const rounds = ft.teams.map(t => resultsOverride ? (res[t]?.round ?? -1) : displayRound(t));
+  const rounds = ft.teams.map(t => {
+    const r = resultsOverride ? (res[t]?.round ?? -1) : displayRound(t);
+    return r < 0 ? r : scoreRound(r);
+  });
   const played = rounds.filter(r => r >= 0);
   return {
     maxRound:    played.length ? Math.max(...played) : -1,
