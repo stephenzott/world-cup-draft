@@ -1110,10 +1110,11 @@ function showTab(name) {
 
 // ── Scoring ────────────────────────────────────────────────────────────────
 
-// All semifinalists score 4 (3rd/4th indistinguishable); all finalists score 5 (runner-up/champion indistinguishable).
+// Semifinalists score 4 (3rd/4th indistinguishable; coin flip breaks tie). Runner-up = 5, Champion = 6.
 function scoreRound(r) {
-  if (r >= 6)   return 5; // finalist
-  if (r >= 3.5) return 4; // semifinalist
+  if (r >= 7)   return 6; // champion
+  if (r >= 6)   return 5; // runner-up
+  if (r >= 3.5) return 4; // semifinalist (3rd or 4th — no distinction in score; coin flip breaks tie)
   return r;
 }
 
