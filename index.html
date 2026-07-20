@@ -1142,10 +1142,22 @@ function sortOrder(resultsOverride) {
     coinFlip: state.coinFlip[ft.id],
   })).sort((a, b) => {
     if (b.score.maxRound    !== a.score.maxRound)    return b.score.maxRound    - a.score.maxRound;
+    // SF losers (maxRound=4): skip totalRounds/GD — coin flip seed is the tiebreaker.
+    if (a.score.maxRound === 4)                      return a.coinFlip - b.coinFlip;
     if (b.score.totalRounds !== a.score.totalRounds) return b.score.totalRounds - a.score.totalRounds;
     if (b.score.totalGD     !== a.score.totalGD)     return b.score.totalGD     - a.score.totalGD;
     return a.coinFlip - b.coinFlip;
   });
+}
+
+// Two teams are coin-flip tied when coinFlip is the deciding sort factor.
+// SF losers (maxRound=4) skip totalRounds/GD by design, so they're always tied with each other.
+// All others need all three score fields to match.
+function coinFlipTied(a, b) {
+  if (a.score.maxRound !== b.score.maxRound) return false;
+  if (a.score.maxRound === 4)               return true;
+  return a.score.totalRounds === b.score.totalRounds &&
+         a.score.totalGD     === b.score.totalGD;
 }
 
 function ownerName(team) {
@@ -1234,11 +1246,7 @@ function renderOrder() {
 
   const coinFlipTiedIds = new Set();
   order.forEach((ft, i) => {
-    const isTiedWith = (other) =>
-      ft.score.maxRound    === other.score.maxRound &&
-      ft.score.totalRounds === other.score.totalRounds &&
-      ft.score.totalGD     === other.score.totalGD;
-    if ((i > 0 && isTiedWith(order[i - 1])) || (i < order.length - 1 && isTiedWith(order[i + 1]))) {
+    if ((i > 0 && coinFlipTied(ft, order[i - 1])) || (i < order.length - 1 && coinFlipTied(ft, order[i + 1]))) {
       coinFlipTiedIds.add(ft.id);
     }
   });
@@ -1773,11 +1781,7 @@ function renderCoinFlips() {
   const order = sortOrder();
   const tiedIds = new Set();
   order.forEach((ft, i) => {
-    const tied = (other) =>
-      ft.score.maxRound    === other.score.maxRound &&
-      ft.score.totalRounds === other.score.totalRounds &&
-      ft.score.totalGD     === other.score.totalGD;
-    if ((i > 0 && tied(order[i - 1])) || (i < order.length - 1 && tied(order[i + 1]))) {
+    if ((i > 0 && coinFlipTied(ft, order[i - 1])) || (i < order.length - 1 && coinFlipTied(ft, order[i + 1]))) {
       tiedIds.add(ft.id);
     }
   });
